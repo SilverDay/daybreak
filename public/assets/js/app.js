@@ -15,4 +15,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (selectAll)   { selectAll.addEventListener('click',   function () { setAll(true);  }); }
     if (deselectAll) { deselectAll.addEventListener('click', function () { setAll(false); }); }
+
+    // CSP-safe confirm dialogs: forms with data-confirm="message" prompt before submit.
+    // Replaces inline onsubmit handlers which are blocked by script-src 'self'.
+    document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            var msg = form.getAttribute('data-confirm');
+            if (msg && !window.confirm(msg)) {
+                e.preventDefault();
+            }
+        });
+    });
 });

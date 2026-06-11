@@ -19,6 +19,12 @@ final class MailService
             throw new \InvalidArgumentException("Invalid recipient address: {$to}");
         }
 
+        // Strip CR/LF from header fields. FILTER_VALIDATE_EMAIL already rejects them,
+        // but explicit sanitisation makes the intent clear and guards against any future
+        // change in PHP's email validator behaviour.
+        $to      = str_replace(["\r", "\n"], '', $to);
+        $subject = str_replace(["\r", "\n"], '', $subject);
+
         if (Config::get('SMTP_HOST') !== null && Config::get('SMTP_HOST') !== '') {
             $this->sendViaSmtp($to, $subject, $body);
         } else {

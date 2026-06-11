@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Daybreak\Controller;
 
 use Daybreak\Database;
-use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
+use Daybreak\Service\DedupService;
 
 /**
  * Personalised feed for authenticated users.
@@ -73,8 +73,8 @@ final class FeedController
             $params[] = $activeCategory;
         }
 
-        $articles = Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at,
+        $articles = DedupService::group(Database::query(
+            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
@@ -87,9 +87,9 @@ final class FeedController
              {$dateWhere}
              {$catWhere}
              ORDER BY a.published_at DESC
-             LIMIT 100",
+             LIMIT 200",
             $params
-        )->fetchAll();
+        )->fetchAll());
 
         $unreadCount = $sinceQuery ? count($articles) : null;
 
@@ -112,7 +112,6 @@ final class FeedController
             "SELECT a.title, a.url, a.summary, a.published_at
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
-             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
              ORDER BY a.published_at DESC LIMIT 15"
         )->fetchAll();
 

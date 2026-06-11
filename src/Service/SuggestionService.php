@@ -30,8 +30,10 @@ final class SuggestionService
 
             // Direct feed: look for RSS/Atom root elements.
             if (preg_match('#<(rss|feed|channel)\b#i', substr($body, 0, 2000))) {
+                $xmlBody = (string) preg_replace('/<!DOCTYPE\b[^[>]*(?:\[[^\]]*])?[^>]*>/is', '', $body);
+                libxml_set_external_entity_loader(static fn() => null);
                 libxml_use_internal_errors(true);
-                $xml = @simplexml_load_string($body);
+                $xml = simplexml_load_string($xmlBody);
                 libxml_clear_errors();
                 if ($xml !== false) {
                     return ['adapter_type' => 'rss_atom', 'feed_url' => $url];

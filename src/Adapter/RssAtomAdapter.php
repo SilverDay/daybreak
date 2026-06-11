@@ -22,7 +22,16 @@ final class RssAtomAdapter implements SourceAdapter
             return new FetchResult([], 304, $res['etag'], $res['last_modified'], true);
         }
 
-        $xml = @simplexml_load_string($res['body'], 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
+        // XXE guard: strip DOCTYPE before parsing. Valid RSS/Atom feeds never use
+        // DOCTYPE; any feed that includes one is either malformed or attempting XXE.
+        // Removing the declaration before it reaches the XML parser eliminates the
+        // attack vector entirely. The regex handles internal subsets (<!DOCTYPE foo [...]>).
+        // libxml_set_external_entity_loader and LIBXML_NONET are additional layers.
+        $xmlBody = (string) preg_replace('/<!DOCTYPE\b[^[>]*(?:\[[^\]]*])?[^>]*>/is', '', $res['body']);
+        libxml_set_external_entity_loader(static fn() => null);
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($xmlBody, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
+        libxml_clear_errors();
         if ($xml === false) {
             return new FetchResult([], $res['status'], $res['etag'], $res['last_modified']);
         }

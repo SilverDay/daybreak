@@ -78,7 +78,7 @@ use Daybreak\Security\Csrf;
       Permanently delete your account and all associated data. This cannot be undone.
     </p>
     <form method="post" action="/settings/account/delete"
-          onsubmit="return confirm('Delete your account permanently?')">
+          data-confirm="Delete your account permanently? This cannot be undone.">
       <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
       <div class="form-group">
         <label class="form-label" for="confirm_delete">

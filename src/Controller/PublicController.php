@@ -5,6 +5,7 @@ namespace Daybreak\Controller;
 
 use Daybreak\Database;
 use Daybreak\Security\Html;
+use Daybreak\Service\DedupService;
 
 /** Public news page: main feed + ransomlook/CVE widgets. Reads cache only — never fetches. */
 final class PublicController
@@ -41,8 +42,8 @@ final class PublicController
             $params[] = $activeCategory;
         }
 
-        $articles = Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at,
+        $articles = DedupService::group(Database::query(
+            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
@@ -53,9 +54,9 @@ final class PublicController
              WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
              {$catWhere}
              ORDER BY a.published_at DESC
-             LIMIT 100",
+             LIMIT 200",
             $params
-        )->fetchAll();
+        )->fetchAll());
 
         // Ransomlook widget: last 7 days, 20 most recent.
         $ransomlookItems = Database::query(
@@ -67,12 +68,14 @@ final class PublicController
              LIMIT 20"
         )->fetchAll();
 
-        // CVE widget: last 7 days, 15 most recent.
+        // CVE widget: most recent 15, no date filter.
+        // The NVD adapter stores at most 20 items per run so the table stays small;
+        // dropping the window prevents the widget going empty when the data is right
+        // at the 7-day boundary or the cron has been delayed.
         $cveItems = Database::query(
             "SELECT a.title, a.url, a.summary, a.published_at
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
-             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
              ORDER BY a.published_at DESC
              LIMIT 15"
         )->fetchAll();

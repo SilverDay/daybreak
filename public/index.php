@@ -11,6 +11,7 @@ use Daybreak\Security\SecurityHeaders;
 use Daybreak\Controller\AdminController;
 use Daybreak\Controller\AuthController;
 use Daybreak\Controller\FeedController;
+use Daybreak\Controller\PageController;
 use Daybreak\Controller\PublicController;
 use Daybreak\Controller\SuggestController;
 use Daybreak\Controller\UserController;
@@ -84,10 +85,10 @@ $router->get( '/admin/users',                    [AdminController::class, 'users
 $router->post('/admin/users/{id}',               [AdminController::class, 'handleUser']);
 $router->get( '/admin/audit',                    [AdminController::class, 'auditList']);
 
-// ── Phase 5 static pages (placeholders) ───────────────────────────────────────
-// $router->get('/imprint', [PageController::class, 'imprint']);
-// $router->get('/terms',   [PageController::class, 'terms']);
-// $router->get('/privacy', [PageController::class, 'privacy']);
+// ── Legal / static pages ───────────────────────────────────────────────────────
+$router->get('/imprint', [PageController::class, 'imprint']);
+$router->get('/terms',   [PageController::class, 'terms']);
+$router->get('/privacy', [PageController::class, 'privacy']);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';

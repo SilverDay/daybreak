@@ -15,5 +15,9 @@ final class SecurityHeaders
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: DENY');
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+        // HSTS: 1 year, apply to subdomains. Only effective over HTTPS.
+        if (($_SERVER['HTTPS'] ?? '') === 'on') {
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+        }
     }
 }

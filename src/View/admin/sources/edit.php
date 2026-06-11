@@ -187,7 +187,7 @@ $s = $source ?? [
   <div class="settings-section danger-zone">
     <h2 class="settings-section-title">Danger zone</h2>
     <form method="post" action="/admin/sources/<?= (int) $s['id'] ?>"
-          onsubmit="return confirm('Delete source &quot;<?= Html::e(addslashes($s['name'])) ?>&quot; and all its articles? This cannot be undone.')">
+          data-confirm="Delete source &quot;<?= Html::e($s['name']) ?>&quot; and all its articles? This cannot be undone.">
       <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
       <input type="hidden" name="action" value="delete">
       <button type="submit" class="btn btn-danger btn-sm">Delete source</button>

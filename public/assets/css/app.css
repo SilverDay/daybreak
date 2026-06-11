@@ -1126,3 +1126,133 @@ code.audit-action {
 }
 .site-nav-link--suggest:hover { background: rgba(37,99,235,0.22); }
 
+/* ── Phase 5: Dedup "also covered by" ───────────────────────────────────────── */
+.article-also-by {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ── Legal pages ─────────────────────────────────────────────────────────────── */
+.legal-page {
+  max-width: 760px;
+  margin: 2.5rem auto 4rem;
+  padding: 0 1.5rem;
+}
+.legal-content {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 3rem;
+  box-shadow: var(--shadow-xs);
+}
+.legal-content h1 {
+  font-size: 1.625rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  color: var(--color-text);
+}
+.legal-content h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 1.75rem 0 0.5rem;
+  color: var(--color-text);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.legal-content p, .legal-content li {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  margin: 0.5rem 0;
+}
+.legal-content ul {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.legal-content address {
+  font-style: normal;
+  line-height: 1.7;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+}
+.legal-lang {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.legal-updated {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem !important;
+}
+.legal-notice {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem !important;
+}
+.legal-placeholder {
+  margin-top: 2rem !important;
+  padding: 0.875rem 1rem;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem !important;
+  color: #78350f !important;
+}
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  margin: 0.75rem 0;
+}
+.legal-table th {
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.legal-table td {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  vertical-align: top;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Accessibility: focus rings ──────────────────────────────────────────────── */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent-light);
+  outline-offset: 2px;
+}
+/* Override browser default outline for elements with explicit focus styles */
+.form-input:focus-visible { outline: none; } /* handled by box-shadow in form rules */
+
+/* ── Mobile: widget collapse ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .widget {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  /* Widget header becomes a tap target that visually suggests collapsibility */
+  .widget-header {
+    cursor: default;
+  }
+  /* Limit widget-body height on small screens to avoid dominating the scroll */
+  .widget-body {
+    max-height: 240px;
+    overflow-y: auto;
+  }
+}
+@media (max-width: 640px) {
+  .legal-content { padding: 1.5rem 1.25rem; }
+  .legal-table { font-size: 0.75rem; }
+}
+
+

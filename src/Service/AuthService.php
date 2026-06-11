@@ -195,7 +195,7 @@ final class AuthService
      */
     public static function forgotPassword(string $email): void
     {
-        $email = mb_strtolower(trim($email));
+        $email = str_replace(["\r", "\n"], '', mb_strtolower(trim($email)));
         $user  = Database::query(
             "SELECT id FROM users WHERE email = ? AND status = 'active'",
             [$email]
@@ -341,6 +341,7 @@ final class AuthService
 
     private static function sendVerificationEmail(int $userId, string $email): void
     {
+        $email     = str_replace(["\r", "\n"], '', $email);
         $rawToken  = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $rawToken);
 

@@ -62,7 +62,7 @@ $_me = AuthService::currentUser();
             </form>
             <?php endif; ?>
             <form method="post" action="/admin/users/<?= (int) $u['id'] ?>"
-                  onsubmit="return confirm('Permanently delete account for <?= Html::e(addslashes($u['email'])) ?>?')">
+                  data-confirm="Permanently delete account for <?= Html::e($u['email']) ?>?">
               <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="delete">
               <button type="submit" class="btn btn-sm btn-danger">Delete</button>

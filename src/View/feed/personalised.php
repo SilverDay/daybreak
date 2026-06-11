@@ -51,7 +51,12 @@ if ($sinceMode): ?>
   <?php if (!empty($a['summary'])): ?>
   <p class="article-summary"><?= Html::e($a['summary']) ?></p>
   <?php endif; ?>
-  <p class="article-attribution"><?= Html::e($a['attribution_text']) ?></p>
+  <p class="article-attribution">
+    <?= Html::e($a['attribution_text']) ?>
+    <?php if (!empty($a['also_by'])): ?>
+    <span class="article-also-by">· Also: <?= Html::e(implode(', ', $a['also_by'])) ?></span>
+    <?php endif; ?>
+  </p>
 </article>
 <?php endforeach; ?>
 <?php endif; ?>
