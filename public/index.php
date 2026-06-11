@@ -8,9 +8,11 @@ require __DIR__ . '/../src/bootstrap.php';
 use Daybreak\Router;
 use Daybreak\Security\DbSessionHandler;
 use Daybreak\Security\SecurityHeaders;
+use Daybreak\Controller\AdminController;
 use Daybreak\Controller\AuthController;
 use Daybreak\Controller\FeedController;
 use Daybreak\Controller\PublicController;
+use Daybreak\Controller\SuggestController;
 use Daybreak\Controller\UserController;
 
 // DB-backed session handler must be registered before session_start().
@@ -64,7 +66,25 @@ $router->get( '/settings/export',          [UserController::class,  'export']);
 $router->get( '/settings/sources',         [UserController::class,  'showSources']);
 $router->post('/settings/sources',         [UserController::class,  'handleSources']);
 
-// ── Phase 4/5 static pages (placeholders) ─────────────────────────────────────
+// ── Source suggestions ────────────────────────────────────────────────────────
+$router->get( '/suggest',              [SuggestController::class, 'show']);
+$router->post('/suggest',              [SuggestController::class, 'handle']);
+
+// ── Admin panel (admin role required) ─────────────────────────────────────────
+$router->get( '/admin',                          [AdminController::class, 'dashboard']);
+$router->get( '/admin/sources',                  [AdminController::class, 'sourcesList']);
+$router->get( '/admin/sources/create',           [AdminController::class, 'sourceCreate']);
+$router->post('/admin/sources/create',           [AdminController::class, 'handleSourceCreate']);
+$router->get( '/admin/sources/{id}',             [AdminController::class, 'sourceEdit']);
+$router->post('/admin/sources/{id}',             [AdminController::class, 'handleSourceEdit']);
+$router->post('/admin/sources/{id}/fetch',       [AdminController::class, 'sourceFetch']);
+$router->get( '/admin/suggestions',              [AdminController::class, 'suggestionsList']);
+$router->post('/admin/suggestions/{id}',         [AdminController::class, 'handleSuggestion']);
+$router->get( '/admin/users',                    [AdminController::class, 'usersList']);
+$router->post('/admin/users/{id}',               [AdminController::class, 'handleUser']);
+$router->get( '/admin/audit',                    [AdminController::class, 'auditList']);
+
+// ── Phase 5 static pages (placeholders) ───────────────────────────────────────
 // $router->get('/imprint', [PageController::class, 'imprint']);
 // $router->get('/terms',   [PageController::class, 'terms']);
 // $router->get('/privacy', [PageController::class, 'privacy']);

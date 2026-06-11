@@ -59,8 +59,12 @@ $_currentUser = AuthService::currentUser();
     <a href="/" class="logo">Daybreak</a>
     <span class="site-tagline">Security News</span>
     <nav class="site-nav" aria-label="User navigation">
+      <a href="/suggest" class="site-nav-link site-nav-link--suggest">Suggest</a>
       <?php if ($_currentUser): ?>
         <a href="/feed" class="site-nav-link<?= ($activeNav ?? '') === 'myfeed' ? ' site-nav-link--active' : '' ?>">My Feed</a>
+        <?php if ($_currentUser['role'] === 'admin'): ?>
+        <a href="/admin" class="site-nav-link">Admin</a>
+        <?php endif; ?>
         <a href="/settings/account" class="site-nav-link"><?= Html::e($_currentUser['display_name']) ?></a>
         <form method="post" action="/logout" class="site-nav-logout">
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
