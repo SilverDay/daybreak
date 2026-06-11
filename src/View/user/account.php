@@ -5,6 +5,28 @@ use Daybreak\Security\Csrf;
 <div class="settings-page">
 
   <section class="settings-section">
+    <h2 class="settings-section-title">Feed preferences</h2>
+    <p class="form-hint" style="margin-bottom:1rem">
+      Manage which sources appear in your feed:
+      <a href="/settings/sources" class="form-link">Source preferences &rarr;</a>
+    </p>
+    <form method="post" action="/settings/account">
+      <input type="hidden" name="_csrf"   value="<?= Html::e(Csrf::token()) ?>">
+      <input type="hidden" name="action"  value="window">
+      <div class="form-group">
+        <label class="form-label" for="default_window_days">Default time window</label>
+        <select id="default_window_days" name="default_window_days" class="form-input">
+          <?php foreach ([1 => 'Last 24 hours', 3 => 'Last 3 days', 7 => 'Last 7 days', 30 => 'Last 30 days'] as $d => $label): ?>
+          <option value="<?= $d ?>"<?= (int)($user['default_window_days'] ?? 1) === $d ? ' selected' : '' ?>><?= Html::e($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <p class="form-hint">Fallback when you switch to &ldquo;Last X days&rdquo; in My Feed.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Save preference</button>
+    </form>
+  </section>
+
+  <section class="settings-section">
     <h2 class="settings-section-title">Display name</h2>
     <form method="post" action="/settings/account">
       <input type="hidden" name="_csrf"   value="<?= Html::e(Csrf::token()) ?>">

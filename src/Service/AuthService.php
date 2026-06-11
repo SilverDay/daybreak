@@ -36,7 +36,8 @@ final class AuthService
             $uid = $_SESSION['user_id'] ?? null;
             if ($uid !== null) {
                 $row = Database::query(
-                    'SELECT id, email, display_name, role, status
+                    'SELECT id, email, display_name, role, status,
+                            default_window_days, last_seen_at
                      FROM users WHERE id = ? AND status = ?',
                     [(int) $uid, 'active']
                 )->fetch();
@@ -301,6 +302,17 @@ final class AuthService
         // FK ON DELETE CASCADE cleans up sessions, auth_tokens, user_sources.
         // audit_log and source_suggestions reference user ON DELETE SET NULL.
         Database::query('DELETE FROM users WHERE id = ?', [$userId]);
+    }
+
+    public static function updateWindowDays(int $userId, int $days): void
+    {
+        $days = max(1, min(30, $days));
+        Database::query('UPDATE users SET default_window_days = ? WHERE id = ?', [$days, $userId]);
+    }
+
+    public static function updateLastSeen(int $userId): void
+    {
+        Database::query('UPDATE users SET last_seen_at = NOW() WHERE id = ?', [$userId]);
     }
 
     public static function exportData(int $userId): array

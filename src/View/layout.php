@@ -31,9 +31,16 @@ $_flashErr = $_SESSION['flash_error'] ?? null;
 if ($_flash)    { unset($_SESSION['flash']); }
 if ($_flashErr) { unset($_SESSION['flash_error']); }
 
-$_wd  = (int) ($windowDays     ?? 1);
-$_cat = $activeCategory ?? null;
-$_filterAction = $_cat !== null ? '/category/' . Html::e($_cat) : '/';
+$_cat     = $activeCategory ?? null;
+// feedBase vars: controllers set these for personalised feed; public page leaves them unset.
+$_base    = $allFeedUrl  ?? '/';
+$_catBase = $catFeedBase ?? '/category/';
+// windowMode can be 'since' (string) or an int; falls back to $windowDays for public page.
+$_winMode = $windowMode  ?? (int) ($windowDays ?? 1);
+$_winOpts = $windowOptions ?? [1 => 'Last 24h', 3 => 'Last 3 days', 7 => 'Last 7 days', 30 => 'Last 30 days'];
+$_filterAction = $_cat !== null
+    ? Html::e($_catBase . $_cat)
+    : Html::e($_base);
 $_currentUser = AuthService::currentUser();
 ?><!doctype html>
 <html lang="en">
@@ -53,6 +60,7 @@ $_currentUser = AuthService::currentUser();
     <span class="site-tagline">Security News</span>
     <nav class="site-nav" aria-label="User navigation">
       <?php if ($_currentUser): ?>
+        <a href="/feed" class="site-nav-link<?= ($activeNav ?? '') === 'myfeed' ? ' site-nav-link--active' : '' ?>">My Feed</a>
         <a href="/settings/account" class="site-nav-link"><?= Html::e($_currentUser['display_name']) ?></a>
         <form method="post" action="/logout" class="site-nav-logout">
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
@@ -68,17 +76,17 @@ $_currentUser = AuthService::currentUser();
 
 <div class="filter-bar" role="navigation" aria-label="Filter articles">
   <div class="filter-bar-inner">
-    <a href="/?days=<?= $_wd ?>"
+    <a href="<?= Html::e($_base) ?>?days=<?= Html::e((string) $_winMode) ?>"
        class="cat-chip<?= $_cat === null ? ' is-active' : '' ?>">All</a>
     <?php foreach ($categories ?? [] as $cat): ?>
-    <a href="/category/<?= Html::e($cat['slug']) ?>?days=<?= $_wd ?>"
+    <a href="<?= Html::e($_catBase . $cat['slug']) ?>?days=<?= Html::e((string) $_winMode) ?>"
        class="cat-chip<?= $_cat === $cat['slug'] ? ' is-active' : '' ?>"><?= Html::e($cat['name']) ?></a>
     <?php endforeach; ?>
     <form class="window-form" method="get" action="<?= $_filterAction ?>">
       <label for="window-days" class="sr-only">Time window</label>
       <select id="window-days" name="days" class="window-select">
-        <?php foreach ([1 => 'Last 24h', 3 => 'Last 3 days', 7 => 'Last 7 days', 30 => 'Last 30 days'] as $d => $label): ?>
-        <option value="<?= $d ?>"<?= $_wd === $d ? ' selected' : '' ?>><?= Html::e($label) ?></option>
+        <?php foreach ($_winOpts as $val => $label): ?>
+        <option value="<?= Html::e((string) $val) ?>"<?= (string) $_winMode === (string) $val ? ' selected' : '' ?>><?= Html::e($label) ?></option>
         <?php endforeach; ?>
       </select>
     </form>

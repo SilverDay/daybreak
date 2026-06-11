@@ -9,6 +9,7 @@ use Daybreak\Router;
 use Daybreak\Security\DbSessionHandler;
 use Daybreak\Security\SecurityHeaders;
 use Daybreak\Controller\AuthController;
+use Daybreak\Controller\FeedController;
 use Daybreak\Controller\PublicController;
 use Daybreak\Controller\UserController;
 
@@ -49,11 +50,19 @@ $router->post('/password/forgot',        [AuthController::class,  'handleForgot'
 $router->get( '/password/reset/{token}', [AuthController::class,  'showReset']);
 $router->post('/password/reset/{token}', [AuthController::class,  'handleReset']);
 
+// ── Personalised feed (auth required) ─────────────────────────────────────────
+$router->get('/feed',                      [FeedController::class,  'feed']);
+$router->get('/feed/category/{slug}',      [FeedController::class,  'feed']);
+
 // ── Account settings (auth required) ──────────────────────────────────────────
 $router->get( '/settings/account',         [UserController::class,  'showAccount']);
 $router->post('/settings/account',         [UserController::class,  'handleAccount']);
 $router->post('/settings/account/delete',  [UserController::class,  'deleteAccount']);
 $router->get( '/settings/export',          [UserController::class,  'export']);
+
+// ── Source preferences (auth required) ────────────────────────────────────────
+$router->get( '/settings/sources',         [UserController::class,  'showSources']);
+$router->post('/settings/sources',         [UserController::class,  'handleSources']);
 
 // ── Phase 4/5 static pages (placeholders) ─────────────────────────────────────
 // $router->get('/imprint', [PageController::class, 'imprint']);

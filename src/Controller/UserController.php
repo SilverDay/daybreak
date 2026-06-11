@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Daybreak\Controller;
 
+use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
@@ -38,7 +39,11 @@ final class UserController
         $userId = (int) $user['id'];
         $action = $_POST['action'] ?? '';
 
-        if ($action === 'name') {
+        if ($action === 'window') {
+            $days = max(1, min(30, (int) ($_POST['default_window_days'] ?? 1)));
+            AuthService::updateWindowDays($userId, $days);
+            $_SESSION['flash'] = 'Default window updated.';
+        } elseif ($action === 'name') {
             $name = trim($_POST['display_name'] ?? '');
             if (!AuthService::updateDisplayName($userId, $name)) {
                 $_SESSION['flash_error'] = 'Display name cannot be empty.';
@@ -87,6 +92,86 @@ final class UserController
         session_start();
         $_SESSION['flash'] = 'Your account has been permanently deleted.';
         header('Location: /');
+        exit;
+    }
+
+    public function showSources(array $args = []): void
+    {
+        AuthService::requireAuth();
+        $user   = AuthService::currentUser();
+        $userId = (int) $user['id'];
+
+        // All active feed sources (widgets excluded — they're not user-selectable).
+        $sources = Database::query(
+            "SELECT s.id, s.name, s.attribution_text,
+                    c.name AS category_name, c.slug AS category_slug, c.sort_order
+             FROM sources s
+             LEFT JOIN source_categories c ON c.id = s.category_id
+             WHERE s.status IN ('active', 'degraded')
+               AND s.adapter_type IN ('rss_atom', 'json_api')
+             ORDER BY c.sort_order, s.name"
+        )->fetchAll();
+
+        // Disabled source IDs for this user (absent row = opted-in by default).
+        $disabledRaw = Database::query(
+            'SELECT source_id FROM user_sources WHERE user_id = ? AND enabled = 0',
+            [$userId]
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $disabledIds = array_flip(array_map('intval', $disabledRaw));
+
+        // Group sources by category name.
+        $grouped = [];
+        foreach ($sources as $s) {
+            $grouped[$s['category_name'] ?? 'Uncategorized'][] = $s;
+        }
+
+        $title     = 'Source preferences';
+        $activeNav = 'settings';
+
+        $categories      = Database::query('SELECT id, name, slug, color FROM source_categories ORDER BY sort_order')->fetchAll();
+        $windowDays      = 1;
+        $activeCategory  = null;
+        $ransomlookItems = [];
+        $cveItems        = [];
+
+        header('Content-Type: text/html; charset=utf-8');
+        include DB_ROOT . '/src/View/layout.php';
+        include DB_ROOT . '/src/View/user/sources.php';
+        include DB_ROOT . '/src/View/layout_end.php';
+    }
+
+    public function handleSources(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+
+        $user   = AuthService::currentUser();
+        $userId = (int) $user['id'];
+
+        // Authoritative list of selectable source IDs from the DB.
+        $allIds = array_map('intval', Database::query(
+            "SELECT id FROM sources
+             WHERE status IN ('active', 'degraded') AND adapter_type IN ('rss_atom', 'json_api')"
+        )->fetchAll(\PDO::FETCH_COLUMN));
+
+        // IDs the user checked (submitted via checkboxes).
+        $checkedIds = array_flip(array_map('intval', (array) ($_POST['sources'] ?? [])));
+
+        // Clear existing preferences and insert disabled rows only.
+        // Absent row = opted-in, so we only need to record opt-outs.
+        Database::query('DELETE FROM user_sources WHERE user_id = ?', [$userId]);
+
+        foreach ($allIds as $sid) {
+            if (!isset($checkedIds[$sid])) {
+                Database::query(
+                    'INSERT INTO user_sources (user_id, source_id, enabled) VALUES (?, ?, 0)',
+                    [$userId, $sid]
+                );
+            }
+        }
+
+        $_SESSION['flash'] = 'Source preferences saved.';
+        header('Location: /settings/sources');
         exit;
     }
 
