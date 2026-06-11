@@ -1,0 +1,11 @@
+# Front-controller routing
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+
+# Hard denies (defence in depth; real secrets live above the docroot anyway)
+<FilesMatch "\.(env|sql|md|lock)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes

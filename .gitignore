@@ -1,0 +1,11 @@
+/config/.env
+/storage/*
+!/storage/.gitkeep
+/vendor/
+*.lock
+.DS_Store
+# Claude Code downloaded skills (not project source)
+/.claude/skills/
+# Python cache
+**/__pycache__/
+*.pyc

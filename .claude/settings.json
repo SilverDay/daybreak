@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Read", "Edit", "Write",
+      "Bash(php *)", "Bash(php migrations/run.php)", "Bash(php bin/fetch.php *)",
+      "Bash(composer *)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)",
+      "Bash(mysql *)", "Bash(mariadb *)", "Bash(ls *)", "Bash(grep *)", "Bash(rg *)"
+    ],
+    "deny": [
+      "Read(./config/.env)",
+      "Bash(curl *)", "Bash(wget *)",
+      "Bash(rm -rf *)", "Bash(git push *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/post-write-check.sh" }
+        ]
+      }
+    ]
+  }
+}
