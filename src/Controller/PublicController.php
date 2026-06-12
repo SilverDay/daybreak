@@ -175,8 +175,8 @@ final class PublicController
             $params
         )->fetchAll();
 
-                $mostActive7d = Database::query(
-                        "SELECT
+        $mostActive7d = Database::query(
+            "SELECT
                                 s.name AS source_name,
                                 c.name AS category_name,
                                 SUM(CASE WHEN a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) AS article_count
@@ -189,10 +189,10 @@ final class PublicController
                          HAVING article_count > 0
                          ORDER BY article_count DESC, s.name ASC
                          LIMIT 10"
-                )->fetchAll();
+        )->fetchAll();
 
-                $mostActive30d = Database::query(
-                        "SELECT
+        $mostActive30d = Database::query(
+            "SELECT
                                 s.name AS source_name,
                                 c.name AS category_name,
                                 SUM(CASE WHEN a.published_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS article_count
@@ -205,10 +205,10 @@ final class PublicController
                          HAVING article_count > 0
                          ORDER BY article_count DESC, s.name ASC
                          LIMIT 10"
-                )->fetchAll();
+        )->fetchAll();
 
-                $freshnessLeaders = Database::query(
-                        "SELECT
+        $freshnessLeaders = Database::query(
+            "SELECT
                                 s.name AS source_name,
                                 c.name AS category_name,
                                 MAX(a.published_at) AS latest_article_at
@@ -221,19 +221,19 @@ final class PublicController
                          HAVING latest_article_at IS NOT NULL
                          ORDER BY latest_article_at DESC, s.name ASC
                          LIMIT 10"
-                )->fetchAll();
+        )->fetchAll();
 
-                $activeToday = Database::query(
-                        "SELECT COUNT(DISTINCT s.id) AS source_count
+        $activeToday = Database::query(
+            "SELECT COUNT(DISTINCT s.id) AS source_count
                          FROM sources s
                          JOIN articles a ON a.source_id = s.id
                          WHERE s.status IN ('active', 'degraded')
                              AND s.adapter_type IN ('rss_atom', 'json_api')
                              AND a.published_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)"
-                )->fetch() ?: [];
+        )->fetch() ?: [];
 
-                $staleSources = Database::query(
-                        "SELECT COUNT(*) AS source_count
+        $staleSources = Database::query(
+            "SELECT COUNT(*) AS source_count
                          FROM (
                                 SELECT s.id, MAX(a.published_at) AS latest_article_at
                                 FROM sources s
@@ -244,10 +244,10 @@ final class PublicController
                          ) stale
                          WHERE stale.latest_article_at IS NULL
                                 OR stale.latest_article_at < DATE_SUB(NOW(), INTERVAL 7 DAY)"
-                )->fetch() ?: [];
+        )->fetch() ?: [];
 
-                $dailyActivityRows = Database::query(
-                        "SELECT
+        $dailyActivityRows = Database::query(
+            "SELECT
                                 s.id AS source_id,
                                 s.name AS source_name,
                                 c.name AS category_name,
@@ -260,11 +260,11 @@ final class PublicController
                              AND a.published_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
                          GROUP BY s.id, s.name, c.name, DATE(a.published_at)
                          ORDER BY s.name ASC, day_key DESC",
-                        $params
-                )->fetchAll();
+            $params
+        )->fetchAll();
 
-                $dailyBreakdown = $this->buildDailyBreakdown($sources, $dailyActivityRows, 14, 20);
-                $derivedMetrics = $this->buildDerivedSourceMetrics($dailyActivityRows, 30);
+        $dailyBreakdown = $this->buildDailyBreakdown($sources, $dailyActivityRows, 14, 20);
+        $derivedMetrics = $this->buildDerivedSourceMetrics($dailyActivityRows, 30);
 
         $title = 'Sources';
         $seoTitle = 'Sources · Daybreak';

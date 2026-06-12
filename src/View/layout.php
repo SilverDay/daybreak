@@ -157,29 +157,29 @@ $ogType = (string) ($ogType ?? 'website');
   </header>
 
   <?php if ($_showFilterBar): ?>
-  <div class="filter-bar" role="navigation" aria-label="Filter articles">
-    <div class="filter-bar-inner">
-      <div class="feed-controls">
-        <div class="feed-controls-chips">
-          <a href="<?= Html::e($_base) ?>?days=<?= Html::e((string) $_winMode) ?>"
-            class="cat-chip<?= $_cat === null ? ' is-active' : '' ?>">All</a>
-          <?php foreach ($categories ?? [] as $cat): ?>
-            <a href="<?= Html::e($_catBase . $cat['slug']) ?>?days=<?= Html::e((string) $_winMode) ?>"
-              class="cat-chip<?= $_cat === $cat['slug'] ? ' is-active' : '' ?>"><?= Html::e($cat['name']) ?></a>
-          <?php endforeach; ?>
-        </div>
-        <form class="window-form" method="get" action="<?= $_filterAction ?>">
-          <label for="window-days" class="sr-only">Time window</label>
-          <span class="window-label" aria-hidden="true">Window</span>
-          <select id="window-days" name="days" class="window-select">
-            <?php foreach ($_winOpts as $val => $label): ?>
-              <option value="<?= Html::e((string) $val) ?>" <?= (string) $_winMode === (string) $val ? ' selected' : '' ?>><?= Html::e($label) ?></option>
+    <div class="filter-bar" role="navigation" aria-label="Filter articles">
+      <div class="filter-bar-inner">
+        <div class="feed-controls">
+          <div class="feed-controls-chips">
+            <a href="<?= Html::e($_base) ?>?days=<?= Html::e((string) $_winMode) ?>"
+              class="cat-chip<?= $_cat === null ? ' is-active' : '' ?>">All</a>
+            <?php foreach ($categories ?? [] as $cat): ?>
+              <a href="<?= Html::e($_catBase . $cat['slug']) ?>?days=<?= Html::e((string) $_winMode) ?>"
+                class="cat-chip<?= $_cat === $cat['slug'] ? ' is-active' : '' ?>"><?= Html::e($cat['name']) ?></a>
             <?php endforeach; ?>
-          </select>
-        </form>
+          </div>
+          <form class="window-form" method="get" action="<?= $_filterAction ?>">
+            <label for="window-days" class="sr-only">Time window</label>
+            <span class="window-label" aria-hidden="true">Window</span>
+            <select id="window-days" name="days" class="window-select">
+              <?php foreach ($_winOpts as $val => $label): ?>
+                <option value="<?= Html::e((string) $val) ?>" <?= (string) $_winMode === (string) $val ? ' selected' : '' ?>><?= Html::e($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </form>
+        </div>
       </div>
     </div>
-  </div>
   <?php endif; ?>
 
   <?php if ($_flash || $_flashErr): ?>
