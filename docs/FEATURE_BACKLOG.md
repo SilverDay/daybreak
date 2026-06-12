@@ -61,21 +61,10 @@ This file captures the remaining improvements identified during the current impl
 ## Product-Sized Follow-Ups
 
 ### 4. Search
-- Add headline and summary search across cached articles.
-- Support filters for category, source, and time window.
-- Good follow-up once the core feed workflow is fully stable.
-
-### 5. Bookmarks 
-- Allow users to store files in their kioju.de account
-- This needs a configuration of the API-key for kioju in the user profile
-- kioju documentation is available at https://kioju.de/api_docs.php
 
 ### 6. Email Digests
 - Add scheduled digests for:
-  - since last visit
   - critical advisories
-  - recent CVEs
-- Reuse the existing mail infrastructure.
 
 ### 7. Trust / Freshness Scoring
 - Surface source health and freshness in the UI.

@@ -14,6 +14,7 @@ use Daybreak\Controller\AuthController;
 use Daybreak\Controller\FeedController;
 use Daybreak\Controller\PageController;
 use Daybreak\Controller\PublicController;
+use Daybreak\Controller\SearchController;
 use Daybreak\Controller\SuggestController;
 use Daybreak\Controller\UserController;
 
@@ -72,6 +73,9 @@ $router->post('/settings/sources',         [UserController::class,  'handleSourc
 // ── Source suggestions ────────────────────────────────────────────────────────
 $router->get('/suggest',              [SuggestController::class, 'show']);
 $router->post('/suggest',              [SuggestController::class, 'handle']);
+
+// ── Search ────────────────────────────────────────────────────────────────────
+$router->get('/search',                [SearchController::class, 'search']);
 
 // ── Admin panel (admin role required) ─────────────────────────────────────────
 $router->get('/admin',                          [AdminController::class, 'dashboard']);
