@@ -68,15 +68,41 @@ final class RansomlookAdapter implements SourceAdapter
         }
 
         if (preg_match('#^https?://#i', $link) === 1) {
-            return $link;
+            return $this->normalizeAbsoluteLink($link);
         }
         if (str_starts_with($link, '//')) {
-            return 'https:' . $link;
+            return $this->normalizeAbsoluteLink('https:' . $link);
         }
         if (str_starts_with($link, '/')) {
-            return self::BASE_URL . $link;
+            return $this->normalizeAbsoluteLink(self::BASE_URL . $link);
         }
 
-        return self::BASE_URL . '/' . ltrim($link, '/');
+        return $this->normalizeAbsoluteLink(self::BASE_URL . '/' . ltrim($link, '/'));
+    }
+
+    private function normalizeAbsoluteLink(string $absolute): string
+    {
+        $parts = parse_url($absolute);
+        if (!is_array($parts)) {
+            return self::FALLBACK_URL;
+        }
+
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if ($host === '' || !str_contains($host, 'ransomlook.io')) {
+            return $absolute;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        // ransomlook currently emits many legacy paths that return 404;
+        // route those to the stable /recent landing page.
+        if (
+            preg_match('#^/(site/)?blog(?:/|$)#i', $path) === 1
+            || preg_match('#^/(site/)?company(?:/|$)#i', $path) === 1
+            || preg_match('#^/Company(?:/|$)#', $path) === 1
+        ) {
+            return self::FALLBACK_URL;
+        }
+
+        return $absolute;
     }
 }

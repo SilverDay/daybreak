@@ -81,6 +81,15 @@ use Daybreak\Security\Csrf;
                                     <?= Html::e($article['category']) ?>
                                 </span>
                             <?php endif; ?>
+                            <?php if (($canBookmarkToKioju ?? false) === true): ?>
+                                <form method="post" action="/bookmark" class="article-bookmark-form">
+                                    <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+                                    <input type="hidden" name="url" value="<?= Html::e($article['url']) ?>">
+                                    <input type="hidden" name="title" value="<?= Html::e($article['title']) ?>">
+                                    <input type="hidden" name="origin" value="search">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Add to Kioju</button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                         <?php if ($article['summary']): ?>
                             <div class="article-summary">
@@ -92,17 +101,6 @@ use Daybreak\Security\Csrf;
                                 <?= Html::e(relativeTime($article['published_at'])) ?>
                             </time>
                         </div>
-                        <?php if (($canBookmarkToKioju ?? false) === true): ?>
-                            <div class="article-actions">
-                                <form method="post" action="/bookmark" class="article-bookmark-form">
-                                    <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
-                                    <input type="hidden" name="url" value="<?= Html::e($article['url']) ?>">
-                                    <input type="hidden" name="title" value="<?= Html::e($article['title']) ?>">
-                                    <input type="hidden" name="origin" value="search">
-                                    <button type="submit" class="btn btn-secondary btn-sm">Save to Kioju</button>
-                                </form>
-                            </div>
-                        <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
             </ul>

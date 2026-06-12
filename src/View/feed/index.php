@@ -21,6 +21,15 @@ use Daybreak\Security\Csrf;
         <?php if (!empty($a['category'])): ?>
           <span class="article-cat"><?= Html::e($a['category']) ?></span>
         <?php endif; ?>
+        <?php if (($canBookmarkToKioju ?? false) === true): ?>
+          <form method="post" action="/bookmark" class="article-bookmark-form">
+            <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+            <input type="hidden" name="url" value="<?= Html::e($a['url']) ?>">
+            <input type="hidden" name="title" value="<?= Html::e($a['title']) ?>">
+            <input type="hidden" name="origin" value="public">
+            <button type="submit" class="btn btn-secondary btn-sm">Add to Kioju</button>
+          </form>
+        <?php endif; ?>
         <?php if (!empty($a['published_at'])): ?>
           <time class="article-time" datetime="<?= Html::e($a['published_at']) ?>"
             title="<?= Html::e($a['published_at']) ?>">
@@ -42,17 +51,6 @@ use Daybreak\Security\Csrf;
           <span class="article-also-by">· Also: <?= Html::e(implode(', ', $a['also_by'])) ?><?php if (!empty($a['also_by_omitted'])): ?> +<?= (int) $a['also_by_omitted'] ?> more<?php endif; ?></span>
         <?php endif; ?>
       </p>
-      <?php if (($canBookmarkToKioju ?? false) === true): ?>
-        <div class="article-actions">
-          <form method="post" action="/bookmark" class="article-bookmark-form">
-            <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
-            <input type="hidden" name="url" value="<?= Html::e($a['url']) ?>">
-            <input type="hidden" name="title" value="<?= Html::e($a['title']) ?>">
-            <input type="hidden" name="origin" value="public">
-            <button type="submit" class="btn btn-secondary btn-sm">Save to Kioju</button>
-          </form>
-        </div>
-      <?php endif; ?>
     </article>
   <?php endforeach; ?>
 <?php endif; ?>

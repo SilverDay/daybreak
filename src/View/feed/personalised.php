@@ -11,6 +11,7 @@ use Daybreak\Security\Csrf;
 // $unreadCount  — int|null: count of new items (only when $sinceQuery)
 // $windowDays   — int: days fallback (used when no previous visit)
 // $markSeenReturnTo — string: local path to return after marking as seen
+
 /** @var bool $canBookmarkToKioju */
 
 $sinceMode = $sinceMode ?? false;
@@ -53,6 +54,15 @@ if ($sinceMode): ?>
         <?php if (!empty($a['category'])): ?>
           <span class="article-cat"><?= Html::e($a['category']) ?></span>
         <?php endif; ?>
+        <?php if (($canBookmarkToKioju ?? false) === true): ?>
+          <form method="post" action="/bookmark" class="article-bookmark-form">
+            <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+            <input type="hidden" name="url" value="<?= Html::e($a['url']) ?>">
+            <input type="hidden" name="title" value="<?= Html::e($a['title']) ?>">
+            <input type="hidden" name="origin" value="feed">
+            <button type="submit" class="btn btn-secondary btn-sm">Add to Kioju</button>
+          </form>
+        <?php endif; ?>
         <?php if (!empty($a['published_at'])): ?>
           <time class="article-time" datetime="<?= Html::e($a['published_at']) ?>"
             title="<?= Html::e($a['published_at']) ?>">
@@ -74,17 +84,6 @@ if ($sinceMode): ?>
           <span class="article-also-by">· Also: <?= Html::e(implode(', ', $a['also_by'])) ?><?php if (!empty($a['also_by_omitted'])): ?> +<?= (int) $a['also_by_omitted'] ?> more<?php endif; ?></span>
         <?php endif; ?>
       </p>
-      <?php if (($canBookmarkToKioju ?? false) === true): ?>
-        <div class="article-actions">
-          <form method="post" action="/bookmark" class="article-bookmark-form">
-            <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
-            <input type="hidden" name="url" value="<?= Html::e($a['url']) ?>">
-            <input type="hidden" name="title" value="<?= Html::e($a['title']) ?>">
-            <input type="hidden" name="origin" value="feed">
-            <button type="submit" class="btn btn-secondary btn-sm">Save to Kioju</button>
-          </form>
-        </div>
-      <?php endif; ?>
     </article>
   <?php endforeach; ?>
 <?php endif; ?>

@@ -134,4 +134,62 @@ final class RansomlookAdapterTest extends TestCase
         $this->assertCount(1, $result->items);
         $this->assertSame('https://www.ransomlook.io/post/target-example', $result->items[0]->url);
     }
+
+    public function testFetchMapsLegacyBlogLinksToRecentFallback(): void
+    {
+        $url = 'https://www.ransomlook.io/api/recent';
+        $fetcher = new FakeFetchClient([
+            $url => [
+                'status' => 200,
+                'body' => json_encode([
+                    [
+                        'group_name' => 'legacy',
+                        'post_title' => 'victim.example',
+                        'discovered' => '',
+                        'link' => '/blog/dead-link',
+                    ],
+                ], JSON_THROW_ON_ERROR),
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+        ]);
+
+        $adapter = new RansomlookAdapter();
+        $result = $adapter->fetch([
+            'feed_url' => $url,
+        ], $fetcher);
+
+        $this->assertCount(1, $result->items);
+        $this->assertSame('https://www.ransomlook.io/recent', $result->items[0]->url);
+    }
+
+    public function testFetchMapsLegacyCompanyLinksToRecentFallback(): void
+    {
+        $url = 'https://www.ransomlook.io/api/recent';
+        $fetcher = new FakeFetchClient([
+            $url => [
+                'status' => 200,
+                'body' => json_encode([
+                    [
+                        'group_name' => 'legacy',
+                        'post_title' => 'victim.example',
+                        'discovered' => '',
+                        'link' => 'https://www.ransomlook.io/Company/TVG/',
+                    ],
+                ], JSON_THROW_ON_ERROR),
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+        ]);
+
+        $adapter = new RansomlookAdapter();
+        $result = $adapter->fetch([
+            'feed_url' => $url,
+        ], $fetcher);
+
+        $this->assertCount(1, $result->items);
+        $this->assertSame('https://www.ransomlook.io/recent', $result->items[0]->url);
+    }
 }

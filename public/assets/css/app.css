@@ -351,14 +351,13 @@ main {
   color: var(--color-text-muted);
 }
 
-.article-actions {
-  margin-top: 0.55rem;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .article-bookmark-form {
   margin: 0;
+}
+
+.article-meta .article-bookmark-form,
+.article-header .article-bookmark-form {
+  margin-left: auto;
 }
 
 .no-articles {
