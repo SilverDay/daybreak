@@ -100,6 +100,58 @@ final class FeedFetcher implements FetchClient
         }
     }
 
+    /**
+     * @param array<string,string> $data
+     * @param list<string> $extraHeaders
+     * @return array{status:int,body:string,etag:?string,last_modified:?string,not_modified:bool}
+     */
+    public function postForm(string $url, array $data, array $extraHeaders = []): array
+    {
+        SsrfGuard::assertSafe($url);
+
+        $ch = curl_init($url);
+        $headers = array_merge([
+            'Accept: application/json, */*;q=0.5',
+            'Content-Type: application/x-www-form-urlencoded',
+        ], $extraHeaders);
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER         => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT        => self::TIMEOUT_S,
+            CURLOPT_USERAGENT      => $this->ua(),
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_BUFFERSIZE     => 16384,
+            CURLOPT_NOPROGRESS     => false,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => http_build_query($data),
+            CURLOPT_PROGRESSFUNCTION => static function ($ch, $dlTotal, $dlNow) {
+                return $dlNow > self::MAX_BYTES ? 1 : 0;
+            },
+        ]);
+
+        $raw    = curl_exec($ch);
+        $errno  = curl_errno($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $hdrLen = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        if ($errno !== 0 || $raw === false) {
+            throw new RuntimeException('fetch failed: curl errno ' . $errno);
+        }
+
+        return [
+            'status'        => $status,
+            'body'          => substr($raw, $hdrLen),
+            'etag'          => null,
+            'last_modified' => null,
+            'not_modified'  => false,
+        ];
+    }
+
     private function resolveRedirect(string $base, string $location): string
     {
         if (preg_match('#^https?://#i', $location)) {

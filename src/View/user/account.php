@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 use Daybreak\Security\Html;
 use Daybreak\Security\Csrf;
+
+/** @var bool $hasKiojuKey */
 ?>
 <div class="settings-page">
 
@@ -70,6 +72,38 @@ use Daybreak\Security\Csrf;
     <h2 class="settings-section-title">Data export</h2>
     <p class="form-hint">Download a copy of your personal data (DSGVO Art. 20).</p>
     <a href="/settings/export" class="btn btn-primary">Download data</a>
+  </section>
+
+  <section class="settings-section">
+    <h2 class="settings-section-title">Kioju bookmarks</h2>
+    <p class="form-hint" style="margin-bottom:1rem">
+      Connect your Kioju API key to save article links directly from Daybreak.
+    </p>
+    <?php if ($hasKiojuKey): ?>
+      <p class="form-hint" style="margin-bottom:1rem">Status: Connected</p>
+    <?php else: ?>
+      <p class="form-hint" style="margin-bottom:1rem">Status: Not connected</p>
+    <?php endif; ?>
+
+    <form method="post" action="/settings/account" style="margin-bottom:0.75rem">
+      <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+      <input type="hidden" name="action" value="kioju_save">
+      <div class="form-group">
+        <label class="form-label" for="kioju_api_key">Kioju API key</label>
+        <input id="kioju_api_key" class="form-input" type="password" name="kioju_api_key"
+               autocomplete="off" placeholder="Paste your API key">
+        <p class="form-hint">Stored encrypted. Current key is never shown.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Save API key</button>
+    </form>
+
+    <?php if ($hasKiojuKey): ?>
+      <form method="post" action="/settings/account">
+        <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+        <input type="hidden" name="action" value="kioju_remove">
+        <button type="submit" class="btn btn-secondary">Remove API key</button>
+      </form>
+    <?php endif; ?>
   </section>
 
   <section class="settings-section settings-section-danger">

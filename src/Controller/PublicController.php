@@ -6,7 +6,9 @@ namespace Daybreak\Controller;
 
 use Daybreak\Database;
 use Daybreak\Security\Html;
+use Daybreak\Service\AuthService;
 use Daybreak\Service\DedupService;
+use Daybreak\Service\KiojuService;
 
 /** Public news page: main feed + ransomlook/CVE widgets. Reads cache only — never fetches. */
 final class PublicController
@@ -92,6 +94,13 @@ final class PublicController
             $title = 'Latest';
         }
         $activeNav = 'feed';
+        $showWidgets = true;
+
+        $currentUser = AuthService::currentUser();
+        $canBookmarkToKioju = false;
+        if ($currentUser !== null) {
+            $canBookmarkToKioju = KiojuService::hasApiKey((int) $currentUser['id']);
+        }
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';

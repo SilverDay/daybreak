@@ -8,6 +8,7 @@ use Daybreak\Database;
 use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\DedupService;
+use Daybreak\Service\KiojuService;
 
 /**
  * Article search across cached articles.
@@ -22,6 +23,8 @@ final class SearchController
         $windowDays     = max(1, min(90, (int) ($_GET['days'] ?? 30)));
         $categorySlug   = isset($_GET['category']) ? mb_substr(trim($_GET['category']), 0, 64) : null;
         $sourceId       = isset($_GET['source']) ? max(0, (int) $_GET['source']) : null;
+        $currentUser    = AuthService::currentUser();
+        $userId         = $currentUser ? (int) $currentUser['id'] : null;
 
         // Categories for filter controls.
         $categories = Database::query(
@@ -52,33 +55,34 @@ final class SearchController
             $searched = true;
 
             // Build search query for both public and personalized contexts.
-            $currentUser = AuthService::currentUser();
-            $userId      = $currentUser ? (int) $currentUser['id'] : null;
-
-            // Base params: search term + date window.
-            $params = ["%{$q}%", "%{$q}%", $windowDays];
+            $params = [];
+            $where = [
+                "(a.title LIKE ? OR a.summary LIKE ?)",
+                "a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)",
+            ];
+            $params[] = "%{$q}%";
+            $params[] = "%{$q}%";
+            $params[] = $windowDays;
 
             // Category filter.
-            $catWhere = '';
             if ($categorySlug !== null && $categorySlug !== '') {
-                $catWhere = 'AND c.slug = ?';
+                $where[] = 'c.slug = ?';
                 $params[] = $categorySlug;
             }
 
             // Source filter.
-            $sourceWhere = '';
             if ($sourceId > 0) {
-                $sourceWhere = 'AND s.id = ?';
+                $where[] = 's.id = ?';
                 $params[] = $sourceId;
             }
 
             // User source preference filter (personalized only).
-            $userSourceWhere = '';
+            $userSourceJoin = '';
             if ($userId !== null) {
                 // For personalized search: exclude sources user has opted out of.
-                $userSourceWhere = 'LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?
-                 WHERE (us.enabled IS NULL OR us.enabled = 1)';
-                array_splice($params, 3, 0, [$userId]); // Insert user_id after initial params
+                $userSourceJoin = 'LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?';
+                $where[] = '(us.enabled IS NULL OR us.enabled = 1)';
+                array_unshift($params, $userId);
             }
 
             $sql = "
@@ -90,11 +94,8 @@ final class SearchController
                     AND s.status IN ('active', 'degraded')
                     AND s.adapter_type IN ('rss_atom', 'json_api')
                 LEFT JOIN source_categories c ON c.id = s.category_id
-                {$userSourceWhere}
-                AND (a.title LIKE ? OR a.summary LIKE ?)
-                AND a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                {$catWhere}
-                {$sourceWhere}
+                {$userSourceJoin}
+                WHERE " . implode(' AND ', $where) . "
                 ORDER BY a.published_at DESC
                 LIMIT 100
             ";
@@ -120,6 +121,12 @@ final class SearchController
         $activeCategory = $categorySlug;
         $allFeedUrl     = '/search';
         $catFeedBase    = '/search?category=';
+        $showWidgets    = false;
+
+        $canBookmarkToKioju = false;
+        if ($currentUser !== null) {
+            $canBookmarkToKioju = KiojuService::hasApiKey($userId);
+        }
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';

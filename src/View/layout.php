@@ -47,6 +47,7 @@ $_filterAction = $_cat !== null
   ? Html::e($_catBase . $_cat)
   : Html::e($_base);
 $_currentUser = AuthService::currentUser();
+$_showWidgets = (bool) ($showWidgets ?? false);
 ?>
 <!doctype html>
 <html lang="en">
@@ -68,6 +69,7 @@ $_currentUser = AuthService::currentUser();
       <span class="site-tagline">Security News</span>
       <nav class="site-nav" aria-label="User navigation">
         <?php if ($_currentUser): ?>
+          <a href="/search" class="site-nav-link<?= ($activeNav ?? '') === 'search' ? ' site-nav-link--active' : '' ?>">Search</a>
           <a href="/suggest" class="site-nav-link site-nav-link--suggest<?= ($activeNav ?? '') === 'suggest' ? ' site-nav-link--active' : '' ?>">Suggest</a>
           <a href="/feed" class="site-nav-link<?= ($activeNav ?? '') === 'myfeed' ? ' site-nav-link--active' : '' ?>">My Feed</a>
           <?php if ($_currentUser['role'] === 'admin'): ?>
@@ -79,6 +81,7 @@ $_currentUser = AuthService::currentUser();
             <button type="submit" class="site-nav-btn">Sign out</button>
           </form>
         <?php else: ?>
+          <a href="/search" class="site-nav-link<?= ($activeNav ?? '') === 'search' ? ' site-nav-link--active' : '' ?>">Search</a>
           <a href="/login" class="site-nav-link">Sign in</a>
           <a href="/register" class="site-nav-link site-nav-link--cta">Register</a>
         <?php endif; ?>
@@ -113,5 +116,5 @@ $_currentUser = AuthService::currentUser();
   <?php endif; ?>
 
   <main>
-    <div class="content-grid">
+    <div class="content-grid<?= $_showWidgets ? '' : ' content-grid--single' ?>">
       <section class="feed-column" aria-label="News articles">

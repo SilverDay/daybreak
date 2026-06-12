@@ -8,6 +8,7 @@ use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\DedupService;
+use Daybreak\Service\KiojuService;
 
 /**
  * Personalised feed for authenticated users.
@@ -135,6 +136,8 @@ final class FeedController
             ? '/feed/category/' . rawurlencode($activeCategory) . '?days=since'
             : '/feed?days=since';
         $activeNav = 'myfeed';
+        $showWidgets = true;
+        $canBookmarkToKioju = KiojuService::hasApiKey($userId);
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';

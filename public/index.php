@@ -11,6 +11,7 @@ use Daybreak\Security\DbSessionHandler;
 use Daybreak\Security\SecurityHeaders;
 use Daybreak\Controller\AdminController;
 use Daybreak\Controller\AuthController;
+use Daybreak\Controller\BookmarkController;
 use Daybreak\Controller\FeedController;
 use Daybreak\Controller\PageController;
 use Daybreak\Controller\PublicController;
@@ -76,6 +77,9 @@ $router->post('/suggest',              [SuggestController::class, 'handle']);
 
 // ── Search ────────────────────────────────────────────────────────────────────
 $router->get('/search',                [SearchController::class, 'search']);
+
+// ── Bookmark sync (auth required) ─────────────────────────────────────────────
+$router->post('/bookmark',             [BookmarkController::class, 'save']);
 
 // ── Admin panel (admin role required) ─────────────────────────────────────────
 $router->get('/admin',                          [AdminController::class, 'dashboard']);

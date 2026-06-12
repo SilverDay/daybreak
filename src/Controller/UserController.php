@@ -7,6 +7,7 @@ use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
+use Daybreak\Service\KiojuService;
 
 /** Account settings, DSGVO data export, and account deletion. */
 final class UserController
@@ -15,6 +16,8 @@ final class UserController
     {
         AuthService::requireAuth();
         $user      = AuthService::currentUser();
+        $userId    = (int) ($user['id'] ?? 0);
+        $hasKiojuKey = KiojuService::hasApiKey($userId);
         $title     = 'Account settings';
         $activeNav = 'settings';
 
@@ -23,6 +26,7 @@ final class UserController
         $cveItems        = [];
         $windowDays      = 1;
         $activeCategory  = null;
+        $showWidgets     = false;
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';
@@ -64,6 +68,16 @@ final class UserController
             } else {
                 $_SESSION['flash'] = 'Password updated.';
             }
+        } elseif ($action === 'kioju_save') {
+            $apiKey = trim((string) ($_POST['kioju_api_key'] ?? ''));
+            if (!KiojuService::setApiKey($userId, $apiKey)) {
+                $_SESSION['flash_error'] = 'Please provide a valid Kioju API key.';
+            } else {
+                $_SESSION['flash'] = 'Kioju API key saved.';
+            }
+        } elseif ($action === 'kioju_remove') {
+            KiojuService::clearApiKey($userId);
+            $_SESSION['flash'] = 'Kioju API key removed.';
         }
 
         header('Location: /settings/account');
@@ -133,6 +147,7 @@ final class UserController
         $activeCategory  = null;
         $ransomlookItems = [];
         $cveItems        = [];
+        $showWidgets     = false;
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';

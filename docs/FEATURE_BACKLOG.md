@@ -60,11 +60,22 @@ This file captures the remaining improvements identified during the current impl
 
 ## Product-Sized Follow-Ups
 
-### 4. Search
+### 4. Search (Implemented)
+- Add headline and summary search across cached articles.
+- Support filters for category, source, and time window.
+- Good follow-up once the core feed workflow is fully stable.
+
+### 5. Bookmarks (Implemented)
+- Allow users to store urls in their kioju.de account
+- This needs a configuration of the API-key for kioju in the user profile
+- kioju documentation is available at https://kioju.de/api_docs.php
 
 ### 6. Email Digests
 - Add scheduled digests for:
+  - since last visit
   - critical advisories
+  - recent CVEs
+- Reuse the existing mail infrastructure.
 
 ### 7. Trust / Freshness Scoring
 - Surface source health and freshness in the UI.
@@ -89,7 +100,11 @@ This file captures the remaining improvements identified during the current impl
 - Extracted DB-free auth logic for direct unit testing.
 - Removed unsupported `html_scrape` from admin source management.
 - Extracted auth email body building into a dedicated helper.
+- Added `/search` with headline/summary matching, category and time-window filters.
+- Added user-configurable Kioju API integration in account settings.
+- Added authenticated `POST /bookmark` flow to save feed/search links to Kioju.
+- Added encrypted-at-rest storage for user Kioju API keys.
 
 ## Recommended Next Start
-- Start with “Search”.
-- It is the best next engineering step because onboarding, health observability, and since-last-visit semantics are now implemented, making search the next highest-impact user feature.
+- Start with “Email Digests”.
+- Search and Bookmarks are now implemented, making digest automation the next highest-impact user feature.

@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Daybreak\Security\Html;
+use Daybreak\Security\Csrf;
+
+/** @var bool $canBookmarkToKioju */
 ?>
 <?php if (empty($articles)): ?>
   <div class="no-articles">
@@ -39,6 +42,17 @@ use Daybreak\Security\Html;
           <span class="article-also-by">· Also: <?= Html::e(implode(', ', $a['also_by'])) ?><?php if (!empty($a['also_by_omitted'])): ?> +<?= (int) $a['also_by_omitted'] ?> more<?php endif; ?></span>
         <?php endif; ?>
       </p>
+      <?php if (($canBookmarkToKioju ?? false) === true): ?>
+        <div class="article-actions">
+          <form method="post" action="/bookmark" class="article-bookmark-form">
+            <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+            <input type="hidden" name="url" value="<?= Html::e($a['url']) ?>">
+            <input type="hidden" name="title" value="<?= Html::e($a['title']) ?>">
+            <input type="hidden" name="origin" value="public">
+            <button type="submit" class="btn btn-secondary btn-sm">Save to Kioju</button>
+          </form>
+        </div>
+      <?php endif; ?>
     </article>
   <?php endforeach; ?>
 <?php endif; ?>
