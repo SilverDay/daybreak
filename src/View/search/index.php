@@ -16,8 +16,8 @@ use Daybreak\Security\Csrf;
 /** @var string $message */
 /** @var bool $canBookmarkToKioju */
 ?>
-<div class="search-page">
-    <div class="search-card">
+<div class="search-page public-data-page">
+    <div class="search-card public-panel public-panel--hero">
         <h1 class="search-title">Search articles</h1>
 
         <form method="get" action="/search" class="search-form">
@@ -63,10 +63,10 @@ use Daybreak\Security\Csrf;
     </div>
 
     <?php if ($searched && count($articles ?? []) > 0): ?>
-        <div class="search-results">
+        <div class="search-results public-data-results">
             <ul class="article-list">
                 <?php foreach ($articles as $article): ?>
-                    <li class="article-item">
+                    <li class="article-item public-data-list-item">
                         <div class="article-header">
                             <h3 class="article-title">
                                 <a href="<?= Html::e($article['url']) ?>"

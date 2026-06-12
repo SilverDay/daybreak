@@ -37,6 +37,7 @@ $router = new Router();
 // ── Public feed ────────────────────────────────────────────────────────────────
 $router->get('/',                        [PublicController::class, 'home']);
 $router->get('/category/{slug}',         [PublicController::class, 'home']);
+$router->get('/sources',                 [PublicController::class, 'sources']);
 
 // ── Registration ────────────────────────────────────────────────────────────────
 $router->get('/register',               [AuthController::class,  'showRegister']);
@@ -99,6 +100,8 @@ $router->get('/admin/audit',                    [AdminController::class, 'auditL
 $router->get('/imprint', [PageController::class, 'imprint']);
 $router->get('/terms',   [PageController::class, 'terms']);
 $router->get('/privacy', [PageController::class, 'privacy']);
+$router->get('/robots.txt', [PageController::class, 'robots']);
+$router->get('/sitemap.xml', [PageController::class, 'sitemap']);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -106,7 +109,18 @@ $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 try {
     $router->dispatch($method, $path);
 } catch (\Throwable $e) {
-    http_response_code(500);
-    error_log('[daybreak] ' . $e->getMessage());
-    echo 'Internal error';
+    $status = http_response_code();
+    if ($status < 400) {
+        $status = 500;
+        http_response_code($status);
+    }
+
+    if ($status >= 500) {
+        error_log('[daybreak] ' . $e->getMessage());
+        echo 'Internal error';
+    } elseif ($status === 419) {
+        echo 'Request expired. Please retry.';
+    } else {
+        echo 'Request failed.';
+    }
 }

@@ -19,7 +19,8 @@ final class Csrf
     public static function check(): void
     {
         $sent = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
-        if (!is_string($sent) || !hash_equals($_SESSION['csrf'] ?? '', $sent)) {
+        $expected = $_SESSION['csrf'] ?? null;
+        if (!is_string($expected) || $expected === '' || !is_string($sent) || $sent === '' || !hash_equals($expected, $sent)) {
             http_response_code(419);
             throw new RuntimeException('CSRF token mismatch');
         }

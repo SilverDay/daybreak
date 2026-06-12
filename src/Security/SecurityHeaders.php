@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Security;
@@ -8,6 +9,8 @@ final class SecurityHeaders
 {
     public static function send(): void
     {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+
         header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; "
             . "style-src 'self'; script-src 'self'; object-src 'none'; "
             . "base-uri 'self'; frame-ancestors 'none'");
@@ -15,9 +18,35 @@ final class SecurityHeaders
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: DENY');
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+        if (self::shouldSendNoIndexHeader($path)) {
+            header('X-Robots-Tag: noindex, nofollow, noarchive');
+        }
         // HSTS: 1 year, apply to subdomains. Only effective over HTTPS.
         if (($_SERVER['HTTPS'] ?? '') === 'on') {
             header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
         }
+    }
+
+    private static function shouldSendNoIndexHeader(string $path): bool
+    {
+        $noIndexPrefixes = [
+            '/admin',
+            '/feed',
+            '/settings',
+            '/password',
+            '/login',
+            '/register',
+            '/verify',
+            '/search',
+            '/suggest',
+        ];
+
+        foreach ($noIndexPrefixes as $prefix) {
+            if ($path === $prefix || str_starts_with($path, $prefix . '/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

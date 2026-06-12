@@ -70,16 +70,32 @@ This file captures the remaining improvements identified during the current impl
 - This needs a configuration of the API-key for kioju in the user profile
 - kioju documentation is available at https://kioju.de/api_docs.php
 
-### 6. Email Digests
+### 6. Email Digests (deferred)
 - Add scheduled digests for:
   - since last visit
   - critical advisories
   - recent CVEs
 - Reuse the existing mail infrastructure.
 
-### 7. Trust / Freshness Scoring
+### 7. Trust / Freshness Scoring (deferred)
 - Surface source health and freshness in the UI.
 - Show whether a source is healthy, stale, degraded, or recently recovered.
+
+### 8. Public Source Statistics
+- Goal: publish a transparent, public-facing source directory with useful aggregate activity stats.
+- Why: users should be able to see where Daybreak content comes from and which sources are active or stale.
+- Start with:
+  - Phase 1: basic public source directory
+  - Phase 2: time-window activity stats, filtering, and top-source freshness views
+- Defer for later:
+  - Phase 3 daily per-source breakdowns and playful analytics
+- Feature spec:
+  - `docs/FEATURE_PUBLIC_SOURCE_STATS.md`
+- Likely files:
+  - `public/index.php`
+  - `src/Controller/PublicController.php`
+  - `src/View/layout.php`
+  - `src/View/page/` or `src/View/sources/`
 
 ## Implemented In This Session
 - Since-last-visit behavior switched to explicit user confirmation: `last_seen_at` is no longer advanced on feed page load.
@@ -108,3 +124,4 @@ This file captures the remaining improvements identified during the current impl
 ## Recommended Next Start
 - Start with “Email Digests”.
 - Search and Bookmarks are now implemented, making digest automation the next highest-impact user feature.
+- If the next priority is public transparency and discovery instead, start with “Public Source Statistics” Phase 1, then Phase 2.
