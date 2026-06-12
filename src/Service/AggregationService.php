@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Service;
@@ -37,7 +38,8 @@ final class AggregationService
             : "SELECT * FROM sources WHERE status IN ('active','degraded') AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())";
         $sources = Database::query($sql)->fetchAll();
 
-        $ok = 0; $err = 0;
+        $ok = 0;
+        $err = 0;
         foreach ($sources as $source) {
             $this->runSource($source) ? $ok++ : $err++;
         }
@@ -94,7 +96,7 @@ final class AggregationService
 
     private function upsert(int $sourceId, \Daybreak\Adapter\NormalizedItem $item): int
     {
-        $dedup = substr(hash('sha256', preg_replace('/[^a-z0-9]+/', '', strtolower($item->title)) ?? ''), 0, 40);
+        $dedup = $this->dedupKey($item);
         $stmt = Database::query(
             'INSERT INTO articles (source_id, guid, title, url, summary, published_at, dedup_key)
              VALUES (?,?,?,?,?,?,?)
@@ -110,6 +112,98 @@ final class AggregationService
             ]
         );
         return $stmt->rowCount() === 1 ? 1 : 0; // 1 = insert, 2 = update (rowCount), 0 = unchanged
+    }
+
+    private function dedupKey(\Daybreak\Adapter\NormalizedItem $item): ?string
+    {
+        $titleFingerprint = $this->titleFingerprint($item->title);
+        $dateBucket = $item->publishedAt?->format('Y-m-d') ?? '';
+
+        if ($titleFingerprint !== '') {
+            return substr(hash('sha256', 'title|' . $titleFingerprint . '|date|' . $dateBucket), 0, 40);
+        }
+
+        $urlFingerprint = $this->urlFingerprint($item->url);
+        if ($urlFingerprint !== '') {
+            return substr(hash('sha256', 'url|' . $urlFingerprint . '|date|' . $dateBucket), 0, 40);
+        }
+
+        return null;
+    }
+
+    private function titleFingerprint(string $title): string
+    {
+        $normalized = html_entity_decode(mb_strtolower($title), ENT_QUOTES, 'UTF-8');
+        $normalized = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $normalized) ?? '';
+        $normalized = trim($normalized);
+        if ($normalized === '') {
+            return '';
+        }
+
+        $stopWords = [
+            'a',
+            'an',
+            'and',
+            'are',
+            'as',
+            'at',
+            'be',
+            'by',
+            'for',
+            'from',
+            'in',
+            'into',
+            'is',
+            'it',
+            'of',
+            'on',
+            'or',
+            'that',
+            'the',
+            'their',
+            'this',
+            'to',
+            'via',
+            'with',
+        ];
+        $stopWordMap = array_fill_keys($stopWords, true);
+
+        $tokens = preg_split('/\s+/u', $normalized) ?: [];
+        $significant = [];
+        foreach ($tokens as $token) {
+            if ($token === '' || isset($stopWordMap[$token])) {
+                continue;
+            }
+            if (mb_strlen($token) < 3 && !preg_match('/^cve-\d{4}-\d+$/', $token)) {
+                continue;
+            }
+            $significant[] = $token;
+            if (count($significant) === 10) {
+                break;
+            }
+        }
+
+        if ($significant === []) {
+            $significant = array_slice($tokens, 0, 10);
+        }
+
+        return implode(' ', $significant);
+    }
+
+    private function urlFingerprint(string $url): string
+    {
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+
+        $host = mb_strtolower((string) $parts['host']);
+        if (str_starts_with($host, 'www.')) {
+            $host = substr($host, 4);
+        }
+
+        $path = trim((string) ($parts['path'] ?? ''), '/');
+        return $path !== '' ? $host . '/' . $path : $host;
     }
 
     private function markSuccess(array $source, ?string $etag, ?string $lastModified): void
@@ -128,7 +222,7 @@ final class AggregationService
     {
         $failures = (int) $source['consecutive_failures'] + 1;
         $status = $failures >= self::FAIL_DISABLE ? 'auto_disabled'
-                : ($failures >= self::FAIL_DEGRADE ? 'degraded' : $source['status']);
+            : ($failures >= self::FAIL_DEGRADE ? 'degraded' : $source['status']);
         Database::query(
             "UPDATE sources SET consecutive_failures = ?, status = ?, last_fetch_at = NOW(),
                 last_error = ?, next_fetch_at = DATE_ADD(NOW(), INTERVAL fetch_interval_min MINUTE)

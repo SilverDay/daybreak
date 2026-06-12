@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Adapter;
 
-use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\FetchClient;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -20,7 +21,7 @@ final class NvdAdapter implements SourceAdapter
         return $adapterType === 'nvd';
     }
 
-    public function fetch(array $source, FeedFetcher $fetcher): FetchResult
+    public function fetch(array $source, FetchClient $fetcher): FetchResult
     {
         $base  = rtrim((string) $source['feed_url'], '?&');
         $tz    = new DateTimeZone('UTC');
@@ -92,14 +93,15 @@ final class NvdAdapter implements SourceAdapter
             if (!empty($cve['published'])) {
                 try {
                     $published = new DateTimeImmutable((string) $cve['published'], new DateTimeZone('UTC'));
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
             }
 
             $items[] = new NormalizedItem(
-                guid:        $id,
-                title:       $id,
-                url:         'https://nvd.nist.gov/vuln/detail/' . rawurlencode($id),
-                summary:     $summary !== '' ? $summary : null,
+                guid: $id,
+                title: $id,
+                url: 'https://nvd.nist.gov/vuln/detail/' . rawurlencode($id),
+                summary: $summary !== '' ? $summary : null,
                 publishedAt: $published,
             );
         }

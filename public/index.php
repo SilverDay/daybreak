@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /** Daybreak front controller. Apache DocumentRoot points here. */
@@ -36,54 +37,55 @@ $router->get('/',                        [PublicController::class, 'home']);
 $router->get('/category/{slug}',         [PublicController::class, 'home']);
 
 // ── Registration ────────────────────────────────────────────────────────────────
-$router->get( '/register',               [AuthController::class,  'showRegister']);
+$router->get('/register',               [AuthController::class,  'showRegister']);
 $router->post('/register',               [AuthController::class,  'handleRegister']);
 
 // ── Email verification ─────────────────────────────────────────────────────────
 $router->get('/verify/{token}',          [AuthController::class,  'verify']);
 
 // ── Login / logout ─────────────────────────────────────────────────────────────
-$router->get( '/login',                  [AuthController::class,  'showLogin']);
+$router->get('/login',                  [AuthController::class,  'showLogin']);
 $router->post('/login',                  [AuthController::class,  'handleLogin']);
 $router->post('/logout',                 [AuthController::class,  'logout']);
 
 // ── Password reset ─────────────────────────────────────────────────────────────
-$router->get( '/password/forgot',        [AuthController::class,  'showForgot']);
+$router->get('/password/forgot',        [AuthController::class,  'showForgot']);
 $router->post('/password/forgot',        [AuthController::class,  'handleForgot']);
-$router->get( '/password/reset/{token}', [AuthController::class,  'showReset']);
+$router->get('/password/reset/{token}', [AuthController::class,  'showReset']);
 $router->post('/password/reset/{token}', [AuthController::class,  'handleReset']);
 
 // ── Personalised feed (auth required) ─────────────────────────────────────────
 $router->get('/feed',                      [FeedController::class,  'feed']);
 $router->get('/feed/category/{slug}',      [FeedController::class,  'feed']);
+$router->post('/feed/mark-seen',           [FeedController::class,  'markSeen']);
 
 // ── Account settings (auth required) ──────────────────────────────────────────
-$router->get( '/settings/account',         [UserController::class,  'showAccount']);
+$router->get('/settings/account',         [UserController::class,  'showAccount']);
 $router->post('/settings/account',         [UserController::class,  'handleAccount']);
 $router->post('/settings/account/delete',  [UserController::class,  'deleteAccount']);
-$router->get( '/settings/export',          [UserController::class,  'export']);
+$router->get('/settings/export',          [UserController::class,  'export']);
 
 // ── Source preferences (auth required) ────────────────────────────────────────
-$router->get( '/settings/sources',         [UserController::class,  'showSources']);
+$router->get('/settings/sources',         [UserController::class,  'showSources']);
 $router->post('/settings/sources',         [UserController::class,  'handleSources']);
 
 // ── Source suggestions ────────────────────────────────────────────────────────
-$router->get( '/suggest',              [SuggestController::class, 'show']);
+$router->get('/suggest',              [SuggestController::class, 'show']);
 $router->post('/suggest',              [SuggestController::class, 'handle']);
 
 // ── Admin panel (admin role required) ─────────────────────────────────────────
-$router->get( '/admin',                          [AdminController::class, 'dashboard']);
-$router->get( '/admin/sources',                  [AdminController::class, 'sourcesList']);
-$router->get( '/admin/sources/create',           [AdminController::class, 'sourceCreate']);
+$router->get('/admin',                          [AdminController::class, 'dashboard']);
+$router->get('/admin/sources',                  [AdminController::class, 'sourcesList']);
+$router->get('/admin/sources/create',           [AdminController::class, 'sourceCreate']);
 $router->post('/admin/sources/create',           [AdminController::class, 'handleSourceCreate']);
-$router->get( '/admin/sources/{id}',             [AdminController::class, 'sourceEdit']);
+$router->get('/admin/sources/{id}',             [AdminController::class, 'sourceEdit']);
 $router->post('/admin/sources/{id}',             [AdminController::class, 'handleSourceEdit']);
 $router->post('/admin/sources/{id}/fetch',       [AdminController::class, 'sourceFetch']);
-$router->get( '/admin/suggestions',              [AdminController::class, 'suggestionsList']);
+$router->get('/admin/suggestions',              [AdminController::class, 'suggestionsList']);
 $router->post('/admin/suggestions/{id}',         [AdminController::class, 'handleSuggestion']);
-$router->get( '/admin/users',                    [AdminController::class, 'usersList']);
+$router->get('/admin/users',                    [AdminController::class, 'usersList']);
 $router->post('/admin/users/{id}',               [AdminController::class, 'handleUser']);
-$router->get( '/admin/audit',                    [AdminController::class, 'auditList']);
+$router->get('/admin/audit',                    [AdminController::class, 'auditList']);
 
 // ── Legal / static pages ───────────────────────────────────────────────────────
 $router->get('/imprint', [PageController::class, 'imprint']);

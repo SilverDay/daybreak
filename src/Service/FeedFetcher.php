@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Service;
@@ -13,21 +14,19 @@ use RuntimeException;
  * clients — SPEC Appendix A note 1), conditional GET, timeout and size caps, and
  * manual redirect handling that re-checks SsrfGuard at every hop.
  */
-final class FeedFetcher
+final class FeedFetcher implements FetchClient
 {
     private const MAX_REDIRECTS = 4;
     private const TIMEOUT_S     = 18;
     private const MAX_BYTES     = 8 * 1024 * 1024; // 8 MB cap
 
-    public function __construct(private readonly string $userAgent = '')
-    {
-    }
+    public function __construct(private readonly string $userAgent = '') {}
 
     private function ua(): string
     {
         return $this->userAgent
             ?: (Config::get('FETCH_USER_AGENT')
-            ?: 'Mozilla/5.0 (compatible; DaybreakAggregator/0.1; +https://daybreak.silverday.de)');
+                ?: 'Mozilla/5.0 (compatible; DaybreakAggregator/0.1; +https://daybreak.silverday.de)');
     }
 
     /**
@@ -41,8 +40,12 @@ final class FeedFetcher
 
             $ch = curl_init($url);
             $headers = ['Accept: application/rss+xml, application/atom+xml, application/xml, application/json;q=0.9, */*;q=0.5'];
-            if ($etag)         { $headers[] = 'If-None-Match: ' . $etag; }
-            if ($lastModified) { $headers[] = 'If-Modified-Since: ' . $lastModified; }
+            if ($etag) {
+                $headers[] = 'If-None-Match: ' . $etag;
+            }
+            if ($lastModified) {
+                $headers[] = 'If-Modified-Since: ' . $lastModified;
+            }
 
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -91,7 +94,7 @@ final class FeedFetcher
                 'status'       => $status,
                 'body'         => $status === 304 ? '' : $body,
                 'etag'         => $this->header($rawHeaders, 'etag'),
-                'last_modified'=> $this->header($rawHeaders, 'last-modified'),
+                'last_modified' => $this->header($rawHeaders, 'last-modified'),
                 'not_modified' => $status === 304,
             ];
         }
@@ -102,9 +105,65 @@ final class FeedFetcher
         if (preg_match('#^https?://#i', $location)) {
             return $location;
         }
-        $p = parse_url($base);
-        $origin = ($p['scheme'] ?? 'https') . '://' . ($p['host'] ?? '');
-        return str_starts_with($location, '/') ? $origin . $location : $origin . '/' . $location;
+
+        $baseParts = parse_url($base);
+        $locationParts = parse_url($location);
+
+        if (!is_array($baseParts) || empty($baseParts['host'])) {
+            throw new RuntimeException('invalid redirect base URL');
+        }
+        if ($locationParts === false) {
+            throw new RuntimeException('invalid redirect location');
+        }
+
+        $scheme = (string) ($baseParts['scheme'] ?? 'https');
+        if (str_starts_with($location, '//')) {
+            return $scheme . ':' . $location;
+        }
+
+        $origin = $scheme . '://' . $baseParts['host'];
+        if (isset($baseParts['port'])) {
+            $origin .= ':' . (int) $baseParts['port'];
+        }
+
+        $query = isset($locationParts['query']) ? '?' . $locationParts['query'] : '';
+        $fragment = isset($locationParts['fragment']) ? '#' . $locationParts['fragment'] : '';
+        $locationPath = (string) ($locationParts['path'] ?? '');
+
+        if ($locationPath === '') {
+            $basePath = (string) ($baseParts['path'] ?? '/');
+            return $origin . ($basePath !== '' ? $basePath : '/') . $query . $fragment;
+        }
+
+        if (str_starts_with($locationPath, '/')) {
+            $path = $locationPath;
+        } else {
+            $basePath = (string) ($baseParts['path'] ?? '/');
+            $baseDir = str_ends_with($basePath, '/') ? $basePath : dirname($basePath);
+            if ($baseDir === '.' || $baseDir === '\\') {
+                $baseDir = '/';
+            }
+            $path = rtrim($baseDir, '/') . '/' . $locationPath;
+        }
+
+        return $origin . $this->normalizePath($path) . $query . $fragment;
+    }
+
+    private function normalizePath(string $path): string
+    {
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($segments);
+                continue;
+            }
+            $segments[] = $segment;
+        }
+
+        return '/' . implode('/', $segments);
     }
 
     private function header(string $rawHeaders, string $name): ?string

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Service;
@@ -74,13 +75,13 @@ final class AuthService
      */
     public static function register(string $email, string $password, string $displayName): void
     {
-        $email       = mb_strtolower(trim($email));
-        $displayName = mb_substr(trim($displayName), 0, 80);
+        $email       = \Daybreak\Service\AuthLogic::normalizeEmail($email);
+        $displayName = \Daybreak\Service\AuthLogic::normalizeDisplayName($displayName);
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new \InvalidArgumentException('Invalid email address.');
         }
-        if (mb_strlen($password) < 12) {
+        if (!\Daybreak\Service\AuthLogic::isPasswordValid($password)) {
             throw new \InvalidArgumentException('Password must be at least 12 characters.');
         }
         if ($displayName === '') {
@@ -131,7 +132,7 @@ final class AuthService
      */
     public static function login(string $email, string $password): bool
     {
-        $email = mb_strtolower(trim($email));
+        $email = \Daybreak\Service\AuthLogic::normalizeEmail($email);
         $ip    = $_SERVER['REMOTE_ADDR'] ?? '';
 
         if (self::isThrottled($email, $ip)) {
@@ -179,8 +180,15 @@ final class AuthService
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $p = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 3600,
-                $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+            setcookie(
+                session_name(),
+                '',
+                time() - 3600,
+                $p['path'],
+                $p['domain'],
+                $p['secure'],
+                $p['httponly']
+            );
         }
         session_destroy();
         self::$userCache  = null;
@@ -195,7 +203,7 @@ final class AuthService
      */
     public static function forgotPassword(string $email): void
     {
-        $email = str_replace(["\r", "\n"], '', mb_strtolower(trim($email)));
+        $email = \Daybreak\Service\AuthLogic::sanitizeEmailHeader($email);
         $user  = Database::query(
             "SELECT id FROM users WHERE email = ? AND status = 'active'",
             [$email]
@@ -213,7 +221,7 @@ final class AuthService
         );
 
         $rawToken  = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $rawToken);
+        $tokenHash = \Daybreak\Service\AuthLogic::tokenHash($rawToken);
 
         Database::query(
             'INSERT INTO auth_tokens (user_id, type, token_hash, expires_at)
@@ -221,18 +229,9 @@ final class AuthService
             [(int) $user['id'], 'password_reset', $tokenHash, self::RESET_TTL_MIN]
         );
 
-        $base = Config::get('APP_BASE_URL', 'https://daybreak.silverday.de');
-        $link = $base . '/password/reset/' . $rawToken;
-
         try {
-            (new MailService())->send(
-                $email,
-                'Reset your Daybreak password',
-                "You requested a password reset for your Daybreak account.\r\n\r\n"
-                . "Click the link below to set a new password:\r\n\r\n{$link}\r\n\r\n"
-                . "This link expires in 60 minutes and can only be used once.\r\n\r\n"
-                . "If you did not request a password reset, you can safely ignore this email."
-            );
+            $mailService = new \Daybreak\Service\MailService();
+            $mailService->sendPasswordReset($email, $rawToken);
         } catch (\Throwable $e) {
             error_log('[daybreak] reset email failed: ' . $e->getMessage());
         }
@@ -240,7 +239,7 @@ final class AuthService
 
     public static function resetPassword(string $rawToken, string $newPassword): bool
     {
-        if (mb_strlen($newPassword) < 12) {
+        if (!\Daybreak\Service\AuthLogic::isPasswordValid($newPassword)) {
             return false;
         }
 
@@ -264,7 +263,7 @@ final class AuthService
 
     public static function changePassword(int $userId, string $current, string $new): bool
     {
-        if (mb_strlen($new) < 12) {
+        if (!\Daybreak\Service\AuthLogic::isPasswordValid($new)) {
             return false;
         }
 
@@ -286,7 +285,7 @@ final class AuthService
 
     public static function updateDisplayName(int $userId, string $name): bool
     {
-        $name = mb_substr(trim($name), 0, 80);
+        $name = \Daybreak\Service\AuthLogic::normalizeDisplayName($name);
         if ($name === '') {
             return false;
         }
@@ -306,7 +305,7 @@ final class AuthService
 
     public static function updateWindowDays(int $userId, int $days): void
     {
-        $days = max(1, min(30, $days));
+        $days = \Daybreak\Service\AuthLogic::clampWindowDays($days);
         Database::query('UPDATE users SET default_window_days = ? WHERE id = ?', [$days, $userId]);
     }
 
@@ -341,9 +340,9 @@ final class AuthService
 
     private static function sendVerificationEmail(int $userId, string $email): void
     {
-        $email     = str_replace(["\r", "\n"], '', $email);
+        $email     = \Daybreak\Service\AuthLogic::sanitizeEmailHeader($email);
         $rawToken  = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $rawToken);
+        $tokenHash = \Daybreak\Service\AuthLogic::tokenHash($rawToken);
 
         Database::query(
             'INSERT INTO auth_tokens (user_id, type, token_hash, expires_at)
@@ -351,18 +350,9 @@ final class AuthService
             [$userId, 'email_verify', $tokenHash, self::VERIFY_TTL_MIN]
         );
 
-        $base = Config::get('APP_BASE_URL', 'https://daybreak.silverday.de');
-        $link = $base . '/verify/' . $rawToken;
-
         try {
-            (new MailService())->send(
-                $email,
-                'Verify your Daybreak account',
-                "Welcome to Daybreak!\r\n\r\n"
-                . "Please verify your email address by clicking the link below:\r\n\r\n{$link}\r\n\r\n"
-                . "This link expires in 24 hours.\r\n\r\n"
-                . "If you did not register for Daybreak, you can safely ignore this email."
-            );
+            $mailService = new \Daybreak\Service\MailService();
+            $mailService->sendVerification($email, $rawToken);
         } catch (\Throwable $e) {
             error_log('[daybreak] verify email failed: ' . $e->getMessage());
         }
@@ -373,7 +363,7 @@ final class AuthService
         $row = Database::query(
             'SELECT id, user_id FROM auth_tokens
              WHERE token_hash = ? AND type = ? AND expires_at > NOW() AND used_at IS NULL',
-            [hash('sha256', $rawToken), $type]
+            [\Daybreak\Service\AuthLogic::tokenHash($rawToken), $type]
         )->fetch();
 
         return $row ?: null;
@@ -409,7 +399,7 @@ final class AuthService
             [$email, self::THROTTLE_MIN]
         )->fetchColumn();
 
-        return $emailFails >= self::MAX_EMAIL_FAILS;
+        return \Daybreak\Service\AuthLogic::shouldThrottle($ipFails, $emailFails, self::MAX_IP_FAILS, self::MAX_EMAIL_FAILS);
     }
 
     private static function recordAttempt(string $email, string $ip, bool $success): void

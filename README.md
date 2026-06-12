@@ -18,6 +18,16 @@ php bin/fetch.php --force                # populate articles
 */5 * * * * php /srv/vhosts/daybreak.silverday.de/bin/fetch.php
 ```
 
+## Tests
+```bash
+php tests/run.php
+```
+
+GitHub Actions also runs the same native suite on pushes and pull requests.
+The workflow also runs `php -l` across `bin/`, `public/`, `src/`, and `tests/`.
+
+Current supported adapter types in the admin UI are `rss_atom`, `json_api`, `ransomlook`, and `nvd`.
+
 ## Layout
 Main news feed (primary column) + ransomlook widget + CVE/NVD widget (SPEC §11).
 

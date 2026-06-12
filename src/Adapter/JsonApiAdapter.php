@@ -1,10 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Adapter;
 
 use Daybreak\Security\Html;
-use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\FetchClient;
 use DateTimeImmutable;
 
 /**
@@ -26,7 +27,7 @@ final class JsonApiAdapter implements SourceAdapter
         return $adapterType === 'json_api';
     }
 
-    public function fetch(array $source, FeedFetcher $fetcher): FetchResult
+    public function fetch(array $source, FetchClient $fetcher): FetchResult
     {
         $res = $fetcher->get(
             (string) $source['feed_url'],
@@ -38,18 +39,117 @@ final class JsonApiAdapter implements SourceAdapter
             return new FetchResult([], 304, $res['etag'], $res['last_modified'], true);
         }
 
-        $map  = json_decode((string) ($source['field_map'] ?? '{}'), true) ?: [];
+        $map = $this->decodeFieldMapLenient((string) ($source['field_map'] ?? '{}'));
         $data = json_decode($res['body'], true);
         if (!is_array($data)) {
             return new FetchResult([], $res['status']);
         }
 
-        $itemsPath = $map['items_path'] ?? null;
-        $rows      = $itemsPath !== null ? ($this->dotGet($data, (string) $itemsPath) ?? []) : $data;
+        $rows = $this->rowsFromPayload($data, $map);
         if (!is_array($rows)) {
             return new FetchResult([], $res['status']);
         }
 
+        return new FetchResult(
+            $this->rowsToItems($rows, $map),
+            $res['status'],
+            $res['etag'],
+            $res['last_modified']
+        );
+    }
+
+    /**
+     * @return array{result:FetchResult,errors:string[],warnings:string[]}
+     */
+    public function preview(array $source, FetchClient $fetcher): array
+    {
+        $res = $fetcher->get(
+            (string) $source['feed_url'],
+            $source['etag'] ?? null,
+            $source['last_modified_hdr'] ?? null
+        );
+
+        if ($res['not_modified']) {
+            return [
+                'result' => new FetchResult([], 304, $res['etag'], $res['last_modified'], true),
+                'errors' => [],
+                'warnings' => [],
+            ];
+        }
+
+        $data = json_decode($res['body'], true);
+        if (!is_array($data)) {
+            return [
+                'result' => new FetchResult([], $res['status'], $res['etag'], $res['last_modified']),
+                'errors' => ['Preview payload is not valid JSON.'],
+                'warnings' => [],
+            ];
+        }
+
+        [$map, $mapErrors] = $this->decodeFieldMapStrict((string) ($source['field_map'] ?? '{}'));
+        if ($mapErrors !== []) {
+            return [
+                'result' => new FetchResult([], $res['status'], $res['etag'], $res['last_modified']),
+                'errors' => $mapErrors,
+                'warnings' => [],
+            ];
+        }
+
+        [$rows, $rowError] = $this->rowsFromPayloadForPreview($data, $map);
+        if ($rowError !== null) {
+            return [
+                'result' => new FetchResult([], $res['status'], $res['etag'], $res['last_modified']),
+                'errors' => [$rowError],
+                'warnings' => [],
+            ];
+        }
+
+        $warnings = $this->diagnoseMapAgainstRows($rows, $map);
+        $items = $this->rowsToItems($rows, $map);
+        if ($items === []) {
+            $warnings[] = 'Preview parsed zero items from the current payload.';
+        }
+
+        return [
+            'result' => new FetchResult($items, $res['status'], $res['etag'], $res['last_modified']),
+            'errors' => [],
+            'warnings' => $warnings,
+        ];
+    }
+
+    /** @param array<string,mixed> $map */
+    private function rowsFromPayload(array $data, array $map): mixed
+    {
+        $itemsPath = $map['items_path'] ?? null;
+        return $itemsPath !== null ? ($this->dotGet($data, (string) $itemsPath) ?? []) : $data;
+    }
+
+    /**
+     * @param array<string,mixed> $map
+     * @return array{0:array<int,mixed>,1:?string}
+     */
+    private function rowsFromPayloadForPreview(array $data, array $map): array
+    {
+        $itemsPath = $map['items_path'] ?? null;
+        $rows = $itemsPath !== null ? $this->dotGet($data, (string) $itemsPath) : $data;
+
+        if ($itemsPath !== null && $rows === null) {
+            return [[], 'Configured items_path does not exist in payload.'];
+        }
+        if (!is_array($rows)) {
+            return [[], 'Configured items_path does not point to an array of items.'];
+        }
+
+        return [$rows, null];
+    }
+
+    /**
+     * @param array<int,mixed> $rows
+     * @param array<string,mixed> $map
+     * @return NormalizedItem[]
+     */
+    private function rowsToItems(array $rows, array $map): array
+    {
         $items = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -68,19 +168,110 @@ final class JsonApiAdapter implements SourceAdapter
 
             $published = null;
             if ($dateStr !== '') {
-                try { $published = new DateTimeImmutable($dateStr); } catch (\Throwable) {}
+                try {
+                    $published = new DateTimeImmutable($dateStr);
+                } catch (\Throwable) {
+                }
             }
 
             $items[] = new NormalizedItem(
-                guid:        $guid !== '' ? $guid : hash('sha256', $url),
-                title:       $title !== '' ? $title : $url,
-                url:         $url,
-                summary:     Html::sanitizeSummary((string) ($rawSum ?? '')) ?: null,
+                guid: $guid !== '' ? $guid : hash('sha256', $url),
+                title: $title !== '' ? $title : $url,
+                url: $url,
+                summary: Html::sanitizeSummary((string) ($rawSum ?? '')) ?: null,
                 publishedAt: $published,
             );
         }
 
-        return new FetchResult($items, $res['status'], $res['etag'], $res['last_modified']);
+        return $items;
+    }
+
+    /** @return array<string,mixed> */
+    private function decodeFieldMapLenient(string $raw): array
+    {
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE || array_is_list($decoded)) {
+            return [];
+        }
+
+        return $decoded;
+    }
+
+    /** @return array{0:array<string,mixed>,1:string[]} */
+    private function decodeFieldMapStrict(string $raw): array
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '' || $trimmed === '{}') {
+            return [[], []];
+        }
+
+        $decoded = json_decode($trimmed, true);
+        if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+            return [[], ['Field map is not valid JSON.']];
+        }
+        if (array_is_list($decoded)) {
+            return [[], ['Field map must be a JSON object with key/value mappings.']];
+        }
+
+        return [$decoded, []];
+    }
+
+    /**
+     * @param array<int,mixed> $rows
+     * @param array<string,mixed> $map
+     * @return string[]
+     */
+    private function diagnoseMapAgainstRows(array $rows, array $map): array
+    {
+        if ($rows === []) {
+            return ['Payload contains no rows at the selected items_path.'];
+        }
+
+        $warnings = [];
+        $keys = ['guid', 'title', 'url', 'summary', 'published_at'];
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $map)) {
+                continue;
+            }
+
+            $path = trim((string) $map[$key]);
+            if ($path === '') {
+                $warnings[] = "Field map path for {$key} is empty.";
+                continue;
+            }
+
+            $foundAny = false;
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                if ($this->dotGet($row, $path) !== null) {
+                    $foundAny = true;
+                    break;
+                }
+            }
+
+            if (!$foundAny) {
+                $warnings[] = "Configured path '{$path}' for {$key} was not found in preview rows.";
+            }
+        }
+
+        $urlPath = (string) ($map['url'] ?? 'url');
+        $usableUrls = 0;
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $candidate = trim((string) ($this->dotGet($row, $urlPath) ?? ''));
+            if ($candidate !== '') {
+                $usableUrls++;
+            }
+        }
+        if ($usableUrls === 0) {
+            $warnings[] = "No usable URL values were found at path '{$urlPath}'.";
+        }
+
+        return $warnings;
     }
 
     private function dotGet(array $data, string $path): mixed

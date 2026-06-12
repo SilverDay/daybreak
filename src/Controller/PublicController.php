@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Controller;
@@ -24,7 +25,10 @@ final class PublicController
         if ($activeCategory !== null) {
             $valid = false;
             foreach ($categories as $cat) {
-                if ($cat['slug'] === $activeCategory) { $valid = true; break; }
+                if ($cat['slug'] === $activeCategory) {
+                    $valid = true;
+                    break;
+                }
             }
             if (!$valid) {
                 http_response_code(404);
@@ -54,7 +58,7 @@ final class PublicController
              WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
              {$catWhere}
              ORDER BY a.published_at DESC
-             LIMIT 200",
+             LIMIT 60",
             $params
         )->fetchAll());
 
@@ -65,7 +69,7 @@ final class PublicController
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'ransomlook'
              WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
              ORDER BY a.published_at DESC
-             LIMIT 20"
+               LIMIT 10"
         )->fetchAll();
 
         // CVE widget: most recent 15, no date filter.
@@ -77,7 +81,7 @@ final class PublicController
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
              ORDER BY a.published_at DESC
-             LIMIT 15"
+               LIMIT 10"
         )->fetchAll();
 
         // Page title: category name or 'Latest'.

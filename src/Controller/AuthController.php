@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Controller;
@@ -74,7 +75,7 @@ final class AuthController
             exit;
         }
 
-        header('Location: /');
+        header('Location: /feed');
         exit;
     }
 

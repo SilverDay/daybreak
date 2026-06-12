@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Adapter;
 
-use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\FetchClient;
 
 /**
  * Contract every source type implements. Adapters never fetch directly —
@@ -16,5 +17,5 @@ interface SourceAdapter
     /**
      * @param array{id:int,feed_url:?string,etag:?string,last_modified_hdr:?string,field_map:?string} $source
      */
-    public function fetch(array $source, FeedFetcher $fetcher): FetchResult;
+    public function fetch(array $source, FetchClient $fetcher): FetchResult;
 }

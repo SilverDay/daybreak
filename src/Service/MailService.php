@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Service;
@@ -13,6 +14,16 @@ use RuntimeException;
  */
 final class MailService
 {
+    public function sendPasswordReset(string $to, string $rawToken): void
+    {
+        $this->send($to, 'Reset your Daybreak password', AuthEmailBuilder::passwordResetBody($rawToken));
+    }
+
+    public function sendVerification(string $to, string $rawToken): void
+    {
+        $this->send($to, 'Verify your Daybreak account', AuthEmailBuilder::verificationBody($rawToken));
+    }
+
     public function send(string $to, string $subject, string $body): void
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
@@ -64,8 +75,12 @@ final class MailService
         ]]);
 
         $sock = @stream_socket_client(
-            "{$scheme}://{$host}:{$port}", $errno, $errstr, 15,
-            STREAM_CLIENT_CONNECT, $ctx
+            "{$scheme}://{$host}:{$port}",
+            $errno,
+            $errstr,
+            15,
+            STREAM_CLIENT_CONNECT,
+            $ctx
         );
         if ($sock === false) {
             throw new RuntimeException("SMTP connect to {$host}:{$port} failed ({$errno}): {$errstr}");

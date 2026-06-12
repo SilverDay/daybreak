@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Controller;
@@ -10,6 +11,7 @@ use Daybreak\Service\AggregationService;
 use Daybreak\Service\AuditLog;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\SourcePreviewService;
 
 /**
  * Admin panel: source CRUD, suggestion moderation, feed health,
@@ -18,6 +20,10 @@ use Daybreak\Service\FeedFetcher;
  */
 final class AdminController
 {
+    private const SUPPORTED_ADAPTERS = ['rss_atom', 'json_api', 'ransomlook', 'nvd'];
+    private const FAIL_DEGRADE = 3;
+    private const FAIL_DISABLE = 8;
+
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
     public function dashboard(array $args = []): void
@@ -28,7 +34,9 @@ final class AdminController
             "SELECT status, COUNT(*) AS n FROM sources GROUP BY status"
         )->fetchAll();
         $counts = [];
-        foreach ($sourceCounts as $r) { $counts[$r['status']] = (int) $r['n']; }
+        foreach ($sourceCounts as $r) {
+            $counts[$r['status']] = (int) $r['n'];
+        }
 
         $pendingSuggestions = (int) Database::query(
             "SELECT COUNT(*) FROM source_suggestions WHERE status = 'pending'"
@@ -38,15 +46,72 @@ final class AdminController
 
         $sources = Database::query(
             "SELECT s.id, s.name, s.slug, s.status, s.consecutive_failures,
-                    s.last_success_at, s.last_error, s.next_fetch_at,
+                    s.last_fetch_at, s.last_success_at, s.last_error, s.next_fetch_at,
                     c.name AS category_name,
                     (SELECT COUNT(*) FROM articles a
                      WHERE a.source_id = s.id
-                       AND a.fetched_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS items_today
+                       AND a.fetched_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS items_today,
+                    (SELECT fl.http_status FROM fetch_log fl
+                     WHERE fl.source_id = s.id
+                     ORDER BY fl.created_at DESC LIMIT 1) AS last_http_status,
+                                        (SELECT ROUND(AVG(fl.duration_ms))
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.duration_ms IS NOT NULL
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS avg_duration_ms,
+                                        (SELECT COUNT(*)
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.status = 'ok'
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS ok_last5,
+                                        (SELECT COUNT(*)
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.status = 'ok'
+                                             AND fl.items_found = 0
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS zero_ok_last5
              FROM sources s
              LEFT JOIN source_categories c ON c.id = s.category_id
              ORDER BY s.status DESC, s.consecutive_failures DESC, s.name"
         )->fetchAll();
+
+        $healthSummary = [
+            'degraded' => 0,
+            'auto_disabled' => 0,
+            'zero_yield_trend' => 0,
+            'stale_24h' => 0,
+        ];
+
+        $now = new \DateTimeImmutable('now');
+        foreach ($sources as $src) {
+            if ((string) $src['status'] === 'degraded') {
+                $healthSummary['degraded']++;
+            }
+            if ((string) $src['status'] === 'auto_disabled') {
+                $healthSummary['auto_disabled']++;
+            }
+
+            $okLast5 = (int) ($src['ok_last5'] ?? 0);
+            $zeroOkLast5 = (int) ($src['zero_ok_last5'] ?? 0);
+            if ($okLast5 >= 3 && $okLast5 === $zeroOkLast5) {
+                $healthSummary['zero_yield_trend']++;
+            }
+
+            $lastSuccessRaw = $src['last_success_at'] ?? null;
+            if (!is_string($lastSuccessRaw) || $lastSuccessRaw === '') {
+                $healthSummary['stale_24h']++;
+                continue;
+            }
+
+            try {
+                $lastSuccess = new \DateTimeImmutable($lastSuccessRaw);
+                if (($now->getTimestamp() - $lastSuccess->getTimestamp()) > 86400) {
+                    $healthSummary['stale_24h']++;
+                }
+            } catch (\Throwable) {
+                $healthSummary['stale_24h']++;
+            }
+        }
 
         $title     = 'Admin — Dashboard';
         $adminNav  = 'dashboard';
@@ -63,7 +128,26 @@ final class AdminController
 
         $sources = Database::query(
             "SELECT s.id, s.name, s.slug, s.status, s.adapter_type,
-                    s.consecutive_failures, s.last_success_at, s.last_error,
+                                        s.consecutive_failures, s.last_fetch_at, s.last_success_at, s.last_error,
+                                        (SELECT fl.http_status FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                         ORDER BY fl.created_at DESC LIMIT 1) AS last_http_status,
+                                        (SELECT ROUND(AVG(fl.duration_ms))
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.duration_ms IS NOT NULL
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS avg_duration_ms,
+                                        (SELECT COUNT(*)
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.status = 'ok'
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS ok_last5,
+                                        (SELECT COUNT(*)
+                                         FROM fetch_log fl
+                                         WHERE fl.source_id = s.id
+                                             AND fl.status = 'ok'
+                                             AND fl.items_found = 0
+                                             AND fl.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS zero_ok_last5,
                     c.name AS category_name
              FROM sources s
              LEFT JOIN source_categories c ON c.id = s.category_id
@@ -93,6 +177,12 @@ final class AdminController
     {
         AuthService::requireAdmin();
         Csrf::check();
+
+        $action = (string) ($_POST['action'] ?? 'save');
+        if ($action === 'preview') {
+            $this->renderSourceFormPreview(null, $_POST);
+            return;
+        }
 
         [$ok, $err, $id] = $this->saveSource(null, $_POST);
         if (!$ok) {
@@ -144,6 +234,10 @@ final class AdminController
                     $_SESSION['flash'] = 'Source saved.';
                 }
                 break;
+
+            case 'preview':
+                $this->renderSourceFormPreview($source, $_POST);
+                return;
 
             case 'enable':
                 Database::query("UPDATE sources SET status = 'active', consecutive_failures = 0 WHERE id = ?", [$id]);
@@ -230,7 +324,11 @@ final class AdminController
 
         $sgId   = (int) ($args['id'] ?? 0);
         $sg     = Database::query('SELECT * FROM source_suggestions WHERE id = ?', [$sgId])->fetch();
-        if (!$sg) { http_response_code(404); echo 'Not found'; exit; }
+        if (!$sg) {
+            http_response_code(404);
+            echo 'Not found';
+            exit;
+        }
 
         $admin  = AuthService::currentUser();
         $action = $_POST['action'] ?? '';
@@ -245,7 +343,9 @@ final class AdminController
                   attribution_text, status, fetch_interval_min, created_by)
                  VALUES (?,?,?,?,?,?,?,?,?,?)',
                 [
-                    $sg['name'], $slug, $sg['homepage_url'],
+                    $sg['name'],
+                    $slug,
+                    $sg['homepage_url'],
                     $sg['feed_url'] ?: null,
                     $sg['detected_adapter'] ?: 'rss_atom',
                     $catId,
@@ -313,7 +413,11 @@ final class AdminController
         }
 
         $target = Database::query('SELECT id, email, display_name FROM users WHERE id = ?', [$targetId])->fetch();
-        if (!$target) { http_response_code(404); echo 'Not found'; exit; }
+        if (!$target) {
+            http_response_code(404);
+            echo 'Not found';
+            exit;
+        }
 
         $action = $_POST['action'] ?? '';
         switch ($action) {
@@ -394,49 +498,59 @@ final class AdminController
      */
     private function saveSource(?int $id, array $post): array
     {
-        $name      = mb_substr(trim($post['name']           ?? ''), 0, 120);
-        $slug      = mb_substr(trim($post['slug']           ?? ''), 0, 120);
-        $homepage  = mb_substr(trim($post['homepage_url']   ?? ''), 0, 500);
-        $feed      = mb_substr(trim($post['feed_url']       ?? ''), 0, 500);
-        $adapter   = $post['adapter_type'] ?? 'rss_atom';
-        $catId     = ($post['category_id'] ?? '') !== '' ? (int) $post['category_id'] : null;
-        $attrib    = mb_substr(trim($post['attribution_text'] ?? ''), 0, 255);
-        $license   = mb_substr(trim($post['license']        ?? ''), 0, 120);
-        $interval  = max(1, min(1440, (int) ($post['fetch_interval_min'] ?? 15)));
-        $fieldMap  = trim($post['field_map'] ?? '');
-
-        if ($name === '') { return [false, 'Name is required.', 0]; }
-        if ($slug === '') { $slug = $this->makeSlug($name); }
-        if ($homepage === '') { return [false, 'Homepage URL is required.', 0]; }
-        if ($attrib === '') { $attrib = $name; }
-
-        $validAdapters = ['rss_atom', 'json_api', 'ransomlook', 'nvd', 'html_scrape'];
-        if (!in_array($adapter, $validAdapters, true)) {
-            return [false, 'Invalid adapter type.', 0];
+        $input = $this->normalizeSourceInput($post);
+        $errors = $this->validateSourceInput($input);
+        if ($errors !== []) {
+            return [false, $errors[0], 0];
         }
 
-        // Validate field_map JSON if provided.
-        $fieldMapJson = null;
-        if ($fieldMap !== '' && $fieldMap !== '{}') {
-            json_decode($fieldMap);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                return [false, 'Field map is not valid JSON.', 0];
-            }
-            $fieldMapJson = $fieldMap;
+        [$fieldMapJson, $fieldMapError] = $this->normalizeFieldMapForStorage((string) $input['field_map']);
+        if ($fieldMapError !== null) {
+            return [false, $fieldMapError, 0];
+        }
+
+        $name = (string) $input['name'];
+        $slug = (string) $input['slug'];
+        $homepage = (string) $input['homepage_url'];
+        $feed = (string) $input['feed_url'];
+        $adapter = (string) $input['adapter_type'];
+        $catId = $input['category_id'];
+        $attrib = (string) $input['attribution_text'];
+        $license = (string) $input['license'];
+        $interval = (int) $input['fetch_interval_min'];
+
+        if ($slug === '') {
+            $slug = $this->makeSlug($name);
+        }
+        if ($attrib === '') {
+            $attrib = $name;
         }
 
         if ($id === null) {
             // Create — check for duplicate slug.
             $exists = Database::query('SELECT id FROM sources WHERE slug = ?', [$slug])->fetch();
-            if ($exists) { $slug .= '-' . substr(bin2hex(random_bytes(2)), 0, 4); }
+            if ($exists) {
+                $slug .= '-' . substr(bin2hex(random_bytes(2)), 0, 4);
+            }
 
             Database::query(
                 'INSERT INTO sources
                  (name, slug, homepage_url, feed_url, adapter_type, category_id,
                   attribution_text, license, fetch_interval_min, field_map, status)
                  VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                [$name, $slug, $homepage, $feed ?: null, $adapter, $catId,
-                 $attrib, $license ?: null, $interval, $fieldMapJson, 'pending']
+                [
+                    $name,
+                    $slug,
+                    $homepage,
+                    $feed ?: null,
+                    $adapter,
+                    $catId,
+                    $attrib,
+                    $license ?: null,
+                    $interval,
+                    $fieldMapJson,
+                    'pending'
+                ]
             );
             return [true, '', (int) Database::lastInsertId()];
         }
@@ -445,8 +559,19 @@ final class AdminController
             'UPDATE sources SET name=?, slug=?, homepage_url=?, feed_url=?, adapter_type=?,
              category_id=?, attribution_text=?, license=?, fetch_interval_min=?, field_map=?
              WHERE id=?',
-            [$name, $slug, $homepage, $feed ?: null, $adapter, $catId,
-             $attrib, $license ?: null, $interval, $fieldMapJson, $id]
+            [
+                $name,
+                $slug,
+                $homepage,
+                $feed ?: null,
+                $adapter,
+                $catId,
+                $attrib,
+                $license ?: null,
+                $interval,
+                $fieldMapJson,
+                $id
+            ]
         );
         return [true, '', $id];
     }
@@ -456,5 +581,166 @@ final class AdminController
         $s = mb_strtolower($name);
         $s = preg_replace('/[^a-z0-9]+/', '-', $s) ?? $s;
         return trim($s, '-');
+    }
+
+    /**
+     * @return array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,fetch_interval_min:int,field_map:string}
+     */
+    private function normalizeSourceInput(array $post): array
+    {
+        return [
+            'name' => mb_substr(trim((string) ($post['name'] ?? '')), 0, 120),
+            'slug' => mb_substr(trim((string) ($post['slug'] ?? '')), 0, 120),
+            'homepage_url' => mb_substr(trim((string) ($post['homepage_url'] ?? '')), 0, 500),
+            'feed_url' => mb_substr(trim((string) ($post['feed_url'] ?? '')), 0, 500),
+            'adapter_type' => mb_substr(trim((string) ($post['adapter_type'] ?? 'rss_atom')), 0, 30),
+            'category_id' => (($post['category_id'] ?? '') !== '' ? (int) $post['category_id'] : null),
+            'attribution_text' => mb_substr(trim((string) ($post['attribution_text'] ?? '')), 0, 255),
+            'license' => mb_substr(trim((string) ($post['license'] ?? '')), 0, 120),
+            'fetch_interval_min' => max(1, min(1440, (int) ($post['fetch_interval_min'] ?? 15))),
+            'field_map' => trim((string) ($post['field_map'] ?? '')),
+        ];
+    }
+
+    /** @return string[] */
+    private function validateSourceInput(array $input): array
+    {
+        if ((string) $input['name'] === '') {
+            return ['Name is required.'];
+        }
+        if ((string) $input['homepage_url'] === '') {
+            return ['Homepage URL is required.'];
+        }
+        if (!$this->isHttpUrl((string) $input['homepage_url'])) {
+            return ['Homepage URL must be a valid http/https URL.'];
+        }
+
+        $adapter = (string) $input['adapter_type'];
+        if (!in_array($adapter, self::SUPPORTED_ADAPTERS, true)) {
+            return ['Unsupported adapter type selected.'];
+        }
+
+        $feedUrl = (string) $input['feed_url'];
+        if ($feedUrl !== '' && !$this->isHttpUrl($feedUrl)) {
+            return ['Feed URL must be a valid http/https URL.'];
+        }
+
+        if (in_array($adapter, ['rss_atom', 'json_api', 'nvd'], true) && $feedUrl === '') {
+            return ['Feed URL is required for the selected adapter.'];
+        }
+
+        if ($adapter === 'json_api') {
+            [, $fieldMapError] = $this->decodeFieldMap((string) $input['field_map']);
+            if ($fieldMapError !== null) {
+                return [$fieldMapError];
+            }
+        }
+
+        return [];
+    }
+
+    private function renderSourceFormPreview(?array $existingSource, array $post): void
+    {
+        $categories = Database::query('SELECT id, name FROM source_categories ORDER BY sort_order')->fetchAll();
+        $recentLog = [];
+
+        $input = $this->normalizeSourceInput($post);
+        $formErrors = $this->validateSourceInput($input);
+
+        $source = $this->sourceFromInput($input, $existingSource);
+        $previewResult = null;
+
+        if ($existingSource !== null) {
+            $recentLog  = Database::query(
+                'SELECT status, http_status, items_found, items_new, duration_ms, error, created_at
+                 FROM fetch_log WHERE source_id = ? ORDER BY created_at DESC LIMIT 10',
+                [(int) $existingSource['id']]
+            )->fetchAll();
+        }
+
+        if ($formErrors === []) {
+            $preview = (new SourcePreviewService(new FeedFetcher()))->preview($source);
+            $previewResult = $preview;
+        }
+
+        $isCreate = $existingSource === null;
+        $title    = $isCreate ? 'Admin — New source' : 'Admin — Edit source';
+        $adminNav = 'sources';
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/sources/edit.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    /**
+     * @param array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,fetch_interval_min:int,field_map:string} $input
+     */
+    private function sourceFromInput(array $input, ?array $existingSource): array
+    {
+        $source = $existingSource ?? [
+            'id' => null,
+            'status' => 'pending',
+            'consecutive_failures' => 0,
+            'last_error' => null,
+            'etag' => null,
+            'last_modified_hdr' => null,
+        ];
+
+        $source['name'] = $input['name'];
+        $source['slug'] = $input['slug'];
+        $source['homepage_url'] = $input['homepage_url'];
+        $source['feed_url'] = $input['feed_url'] !== '' ? $input['feed_url'] : null;
+        $source['adapter_type'] = $input['adapter_type'];
+        $source['category_id'] = $input['category_id'];
+        $source['attribution_text'] = $input['attribution_text'];
+        $source['license'] = $input['license'];
+        $source['fetch_interval_min'] = $input['fetch_interval_min'];
+        $source['field_map'] = $input['field_map'];
+
+        return $source;
+    }
+
+    /** @return array{0:?string,1:?string} [fieldMapForStorage, error] */
+    private function normalizeFieldMapForStorage(string $rawFieldMap): array
+    {
+        $trimmed = trim($rawFieldMap);
+        if ($trimmed === '' || $trimmed === '{}') {
+            return [null, null];
+        }
+
+        [, $error] = $this->decodeFieldMap($trimmed);
+        if ($error !== null) {
+            return [null, $error];
+        }
+
+        return [$trimmed, null];
+    }
+
+    /** @return array{0:array<string,mixed>,1:?string} [decodedMap, error] */
+    private function decodeFieldMap(string $rawFieldMap): array
+    {
+        $trimmed = trim($rawFieldMap);
+        if ($trimmed === '' || $trimmed === '{}') {
+            return [[], null];
+        }
+
+        $decoded = json_decode($trimmed, true);
+        if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+            return [[], 'Field map is not valid JSON.'];
+        }
+        if (array_is_list($decoded)) {
+            return [[], 'Field map must be a JSON object with key/value mappings.'];
+        }
+
+        return [$decoded, null];
+    }
+
+    private function isHttpUrl(string $url): bool
+    {
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        return is_string($scheme) && in_array(strtolower($scheme), ['http', 'https'], true);
     }
 }

@@ -1,10 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Adapter;
 
 use Daybreak\Security\Html;
-use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\FetchClient;
 use DateTimeImmutable;
 
 /** Parses RSS 2.0 and Atom. The workhorse adapter for most sources. */
@@ -15,7 +16,7 @@ final class RssAtomAdapter implements SourceAdapter
         return $adapterType === 'rss_atom';
     }
 
-    public function fetch(array $source, FeedFetcher $fetcher): FetchResult
+    public function fetch(array $source, FetchClient $fetcher): FetchResult
     {
         $res = $fetcher->get((string) $source['feed_url'], $source['etag'] ?? null, $source['last_modified_hdr'] ?? null);
         if ($res['not_modified']) {
@@ -73,7 +74,10 @@ final class RssAtomAdapter implements SourceAdapter
     {
         $published = null;
         if ($date !== '') {
-            try { $published = new DateTimeImmutable($date); } catch (\Throwable) {}
+            try {
+                $published = new DateTimeImmutable($date);
+            } catch (\Throwable) {
+            }
         }
         return new NormalizedItem(
             guid: $guid !== '' ? $guid : hash('sha256', $url),

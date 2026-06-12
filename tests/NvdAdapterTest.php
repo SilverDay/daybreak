@@ -1,0 +1,96 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Daybreak\Tests;
+
+use Daybreak\Adapter\NvdAdapter;
+
+final class NvdAdapterTest extends TestCase
+{
+    public function testFetchMapsNvdItems(): void
+    {
+        $baseUrl = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
+        $requestUrl = $this->nvdRequestUrl($baseUrl);
+
+        $fetcher = new FakeFetchClient([
+            $requestUrl => [
+                'status' => 200,
+                'body' => json_encode([
+                    'vulnerabilities' => [[
+                        'cve' => [
+                            'id' => 'CVE-2026-1234',
+                            'published' => '2026-06-10T08:00:00.000',
+                            'descriptions' => [
+                                ['lang' => 'en', 'value' => 'Critical remote code execution in widget stack.'],
+                            ],
+                            'metrics' => [
+                                'cvssMetricV31' => [[
+                                    'cvssData' => [
+                                        'baseSeverity' => 'CRITICAL',
+                                        'baseScore' => 9.8,
+                                    ],
+                                ]],
+                            ],
+                        ],
+                    ]],
+                ], JSON_THROW_ON_ERROR),
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+        ]);
+
+        $adapter = new NvdAdapter();
+        $result = $adapter->fetch([
+            'feed_url' => $baseUrl,
+        ], $fetcher);
+
+        $this->assertCount(1, $result->items);
+        $this->assertSame('CVE-2026-1234', $result->items[0]->guid);
+        $this->assertSame('CVE-2026-1234', $result->items[0]->title);
+        $this->assertSame('https://nvd.nist.gov/vuln/detail/CVE-2026-1234', $result->items[0]->url);
+        $this->assertSame(
+            'CRITICAL (9.8) — Critical remote code execution in widget stack.',
+            $result->items[0]->summary
+        );
+        $this->assertSame('2026-06-10 08:00:00', $result->items[0]->publishedAt?->format('Y-m-d H:i:s'));
+        $this->assertSame($requestUrl, $fetcher->calls[0]['url']);
+    }
+
+    public function testFetchReturnsEmptyResultForInvalidPayload(): void
+    {
+        $baseUrl = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
+        $requestUrl = $this->nvdRequestUrl($baseUrl);
+
+        $fetcher = new FakeFetchClient([
+            $requestUrl => [
+                'status' => 200,
+                'body' => json_encode(['unexpected' => true], JSON_THROW_ON_ERROR),
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+        ]);
+
+        $adapter = new NvdAdapter();
+        $result = $adapter->fetch([
+            'feed_url' => $baseUrl,
+        ], $fetcher);
+
+        $this->assertCount(0, $result->items);
+        $this->assertSame(200, $result->httpStatus);
+    }
+
+    private function nvdRequestUrl(string $baseUrl): string
+    {
+        $tz = new \DateTimeZone('UTC');
+        $start = (new \DateTimeImmutable('-7 days', $tz))->format('Y-m-d\TH:i:s.000');
+        $end = (new \DateTimeImmutable('now', $tz))->format('Y-m-d\TH:i:s.000');
+
+        return rtrim($baseUrl, '?&')
+            . '?pubStartDate=' . urlencode($start)
+            . '&pubEndDate=' . urlencode($end)
+            . '&resultsPerPage=20';
+    }
+}

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Controller;
@@ -12,6 +13,8 @@ final class SuggestController
 {
     public function show(array $args = []): void
     {
+        AuthService::requireAuth();
+
         $title     = 'Suggest a source';
         $activeNav = 'suggest';
         include DB_ROOT . '/src/View/layout.php';
@@ -21,6 +24,7 @@ final class SuggestController
 
     public function handle(array $args = []): void
     {
+        AuthService::requireAuth();
         Csrf::check();
 
         $name     = mb_substr(trim($_POST['name']         ?? ''), 0, 120);

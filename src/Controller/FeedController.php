@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Controller;
 
 use Daybreak\Database;
+use Daybreak\Security\Csrf;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\DedupService;
 
@@ -42,7 +44,10 @@ final class FeedController
         if ($activeCategory !== null) {
             $valid = false;
             foreach ($categories as $cat) {
-                if ($cat['slug'] === $activeCategory) { $valid = true; break; }
+                if ($cat['slug'] === $activeCategory) {
+                    $valid = true;
+                    break;
+                }
             }
             if (!$valid) {
                 http_response_code(404);
@@ -87,17 +92,11 @@ final class FeedController
              {$dateWhere}
              {$catWhere}
              ORDER BY a.published_at DESC
-             LIMIT 200",
+             LIMIT 60",
             $params
         )->fetchAll());
 
         $unreadCount = $sinceQuery ? count($articles) : null;
-
-        // Advance last_seen_at now that the user has seen the since-mode page.
-        // Also initialise it on first visit.
-        if ($sinceMode) {
-            AuthService::updateLastSeen($userId);
-        }
 
         // Widget rail (same as public page, not filtered by user sources).
         $ransomlookItems = Database::query(
@@ -105,14 +104,14 @@ final class FeedController
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'ransomlook'
              WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-             ORDER BY a.published_at DESC LIMIT 20"
+               ORDER BY a.published_at DESC LIMIT 10"
         )->fetchAll();
 
         $cveItems = Database::query(
             "SELECT a.title, a.url, a.summary, a.published_at
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
-             ORDER BY a.published_at DESC LIMIT 15"
+               ORDER BY a.published_at DESC LIMIT 10"
         )->fetchAll();
 
         // Feed base paths for layout.php filter bar.
@@ -132,11 +131,67 @@ final class FeedController
         } else {
             $title = 'My Feed';
         }
+        $markSeenReturnTo = $activeCategory !== null
+            ? '/feed/category/' . rawurlencode($activeCategory) . '?days=since'
+            : '/feed?days=since';
         $activeNav = 'myfeed';
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/layout.php';
         include DB_ROOT . '/src/View/feed/personalised.php';
         include DB_ROOT . '/src/View/layout_end.php';
+    }
+
+    public function markSeen(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+
+        $user = AuthService::currentUser();
+        AuthService::updateLastSeen((int) $user['id']);
+
+        $_SESSION['flash'] = 'Feed marked as seen.';
+        $returnTo = $this->safeReturnPath((string) ($_POST['return_to'] ?? '/feed?days=since'));
+        header('Location: ' . $returnTo);
+        exit;
+    }
+
+    private function safeReturnPath(string $candidate): string
+    {
+        $default = '/feed?days=since';
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            return $default;
+        }
+
+        $parts = parse_url($candidate);
+        if (!is_array($parts)) {
+            return $default;
+        }
+
+        // Reject anything that is not a plain local path/query.
+        if (
+            isset($parts['scheme']) || isset($parts['host']) || isset($parts['user'])
+            || isset($parts['pass']) || isset($parts['port']) || isset($parts['fragment'])
+        ) {
+            return $default;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        $isFeedPath = $path === '/feed' || preg_match('#^/feed/category/[a-z0-9-]+$#', $path) === 1;
+        if (!$isFeedPath) {
+            return $default;
+        }
+
+        $days = 'since';
+        if (isset($parts['query'])) {
+            parse_str((string) $parts['query'], $queryParams);
+            $requestedDays = (string) ($queryParams['days'] ?? 'since');
+            if (in_array($requestedDays, ['since', '1', '3', '7', '30'], true)) {
+                $days = $requestedDays;
+            }
+        }
+
+        return $path . '?days=' . rawurlencode($days);
     }
 }
