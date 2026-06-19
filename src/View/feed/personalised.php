@@ -14,13 +14,16 @@ use Daybreak\Security\Csrf;
 
 /** @var bool $canBookmarkToKioju */
 
-$sinceMode = $sinceMode ?? false;
-$sinceQuery = $sinceQuery ?? false;
-$lastSeen = $lastSeen ?? null;
-$unreadCount = $unreadCount ?? null;
-$windowDays = $windowDays ?? 1;
-$articles = $articles ?? [];
+$sinceMode      = $sinceMode      ?? false;
+$sinceQuery     = $sinceQuery     ?? false;
+$lastSeen       = $lastSeen       ?? null;
+$unreadCount    = $unreadCount    ?? null;
+$windowDays     = $windowDays     ?? 1;
+$articles       = $articles       ?? [];
 $markSeenReturnTo = $markSeenReturnTo ?? '/feed?days=since';
+$page           = $page           ?? 1;
+$totalPages     = $totalPages     ?? 1;
+$paginationBase = $paginationBase ?? null;
 
 if ($sinceMode): ?>
   <div class="since-banner<?= ($sinceQuery && $unreadCount !== null) ? '' : ' since-banner--init' ?>">
@@ -86,4 +89,17 @@ if ($sinceMode): ?>
       </p>
     </article>
   <?php endforeach; ?>
+<?php endif; ?>
+<?php if ($totalPages > 1 && $paginationBase !== null): ?>
+  <nav class="feed-pagination" aria-label="Page navigation">
+    <?php if ($page > 1): ?>
+      <a href="<?= Html::e($paginationBase . 1) ?>" class="btn btn-secondary btn-sm">First</a>
+      <a href="<?= Html::e($paginationBase . ($page - 1)) ?>" class="btn btn-secondary btn-sm">&larr; Prev</a>
+    <?php endif; ?>
+    <span class="feed-pagination-info">Page <?= $page ?> of <?= $totalPages ?></span>
+    <?php if ($page < $totalPages): ?>
+      <a href="<?= Html::e($paginationBase . ($page + 1)) ?>" class="btn btn-secondary btn-sm">Next &rarr;</a>
+      <a href="<?= Html::e($paginationBase . $totalPages) ?>" class="btn btn-secondary btn-sm">Last</a>
+    <?php endif; ?>
+  </nav>
 <?php endif; ?>

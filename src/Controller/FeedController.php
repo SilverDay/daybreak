@@ -35,6 +35,10 @@ final class FeedController
         // $windowMode is consumed by layout.php for the window-select dropdown.
         $windowMode = $sinceMode ? 'since' : $windowDays;
 
+        // Pagination params (both modes).
+        $page  = max(1, (int) ($_GET['page'] ?? 1));
+        $limit = 20;
+
         $activeCategory = isset($args['slug']) && $args['slug'] !== '' ? $args['slug'] : null;
 
         // Categories for the filter bar.
@@ -114,11 +118,22 @@ final class FeedController
              {$dateWhere}
              {$catWhere}
              ORDER BY a.published_at DESC
-             LIMIT 60",
+             LIMIT 2000",
             $params
         )->fetchAll());
 
-        $unreadCount = $sinceQuery ? count($articles) : null;
+        // Compute total and unreadCount BEFORE slicing so the "N new items" banner
+        // reflects the full deduplicated result, not just the current page.
+        $total       = count($articles);
+        $totalPages  = max(1, (int) ceil($total / $limit));
+        $page        = min($page, $totalPages);
+        $unreadCount = $sinceQuery ? $total : null;
+        $articles    = array_slice($articles, ($page - 1) * $limit, $limit);
+
+        $paginationBase = ($activeCategory !== null
+            ? '/feed/category/' . rawurlencode($activeCategory) . '?days=' . $windowMode
+            : '/feed?days=' . $windowMode
+        ) . '&page=';
 
         // Widget rail (same as public page, not filtered by user sources).
         $ransomlookItems = Database::query(

@@ -2483,3 +2483,17 @@ textarea:focus-visible {
 [data-theme="dark"] .freshness-badge--recovered { background: rgba(37, 99, 235, 0.18); color: #93c5fd; }
 [data-theme="dark"] .freshness-badge--degraded  { background: rgba(234, 88, 12, 0.18); color: #fdba74; }
 [data-theme="dark"] .freshness-badge--down      { background: rgba(220, 38, 38, 0.18); color: #fca5a5; }
+
+/* ── Feed pagination ────────────────────────────────────────────────────────── */
+.feed-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.feed-pagination-info {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
