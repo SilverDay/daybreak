@@ -108,6 +108,7 @@ $seoDescription = (string) ($seoDescription ?? 'Account settings for Daybreak.')
       <a href="/settings/account"  class="admin-nav-link<?= $_settingsNav === 'general'  ? ' is-active' : '' ?>">General</a>
       <a href="/settings/security" class="admin-nav-link<?= $_settingsNav === 'security' ? ' is-active' : '' ?>">Security</a>
       <a href="/settings/sources"  class="admin-nav-link<?= $_settingsNav === 'feed'     ? ' is-active' : '' ?>">Edit feed</a>
+      <a href="/settings/watch"    class="admin-nav-link<?= $_settingsNav === 'watch'    ? ' is-active' : '' ?>">Watch terms</a>
     </div>
   </div>
 

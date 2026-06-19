@@ -2497,3 +2497,32 @@ textarea:focus-visible {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
+
+/* ── Watch alerts ─────────────────────────────────────────────────────────────── */
+.watch-alerts {
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.watch-alerts-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.625rem;
+}
+.watch-alert-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.watch-alert-item { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.watch-alert-item a { font-size: 0.875rem; color: var(--color-text); text-decoration: none; }
+.watch-alert-item a:hover { text-decoration: underline; color: var(--color-accent-light); }
+
+/* ── Article card highlight (watch term match) ────────────────────────────────── */
+.article-card--highlight { border-left: 3px solid var(--color-accent-light); }
+
+/* ── Watch term list (settings page) ─────────────────────────────────────────── */
+.watch-term-list { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.watch-term-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9375rem; }
+.watch-term-item span { flex: 1; }

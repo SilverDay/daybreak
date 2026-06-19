@@ -24,8 +24,27 @@ $markSeenReturnTo = $markSeenReturnTo ?? '/feed?days=since';
 $page           = $page           ?? 1;
 $totalPages     = $totalPages     ?? 1;
 $paginationBase = $paginationBase ?? null;
+$alertArticles  = $alertArticles  ?? [];
+$watchTerms     = $watchTerms     ?? [];
 
-if ($sinceMode): ?>
+if ($alertArticles !== []): ?>
+  <div class="watch-alerts" role="region" aria-label="Watch term alerts">
+    <p class="watch-alerts-title">Watch term alerts</p>
+    <ul class="watch-alert-list">
+      <?php foreach ($alertArticles as $wa): ?>
+        <li class="watch-alert-item">
+          <a href="<?= Html::e($wa['url']) ?>" target="_blank" rel="noopener noreferrer nofollow">
+            <?= Html::e($wa['title']) ?>
+          </a>
+          <span class="source-badge" style="--badge-color:<?= Html::e($wa['color'] ?? '#909090') ?>">
+            <?= Html::e($wa['source_name']) ?>
+          </span>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+<?php endif; ?>
+<?php if ($sinceMode): ?>
   <div class="since-banner<?= ($sinceQuery && $unreadCount !== null) ? '' : ' since-banner--init' ?>">
     <?php if ($sinceQuery && $unreadCount !== null): ?>
       <strong class="since-count"><?= $unreadCount ?></strong>
@@ -49,7 +68,7 @@ if ($sinceMode): ?>
   </div>
 <?php else: ?>
   <?php foreach ($articles as $a): ?>
-    <article class="article-card">
+    <article class="article-card<?= ($a['watch_match'] ?? false) ? ' article-card--highlight' : '' ?>">
       <div class="article-meta">
         <span class="source-badge" style="--badge-color:<?= Html::e($a['color'] ?? '#909090') ?>">
           <?= Html::e($a['source_name']) ?>

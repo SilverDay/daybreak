@@ -122,6 +122,35 @@ final class FeedController
             $params
         )->fetchAll());
 
+        // Load user's watch terms and flag matching articles.
+        // Done before slicing so $alertArticles covers the full 24h window, not just
+        // the current page.
+        $rawTerms   = Database::query(
+            'SELECT id, term FROM user_watch_terms WHERE user_id = ? ORDER BY created_at ASC',
+            [$userId]
+        )->fetchAll();
+        $lowerTerms  = array_map(fn($t) => mb_strtolower($t['term']), $rawTerms);
+        $watchTerms  = array_column($rawTerms, 'term');
+        $alertArticles = [];
+        foreach ($articles as &$a) {
+            if ($lowerTerms === []) {
+                $a['watch_match'] = false;
+                continue;
+            }
+            $hay = mb_strtolower($a['title'] . ' ' . ($a['summary'] ?? ''));
+            $a['watch_match'] = false;
+            foreach ($lowerTerms as $lt) {
+                if (str_contains($hay, $lt)) {
+                    $a['watch_match'] = true;
+                    break;
+                }
+            }
+            if ($a['watch_match']) {
+                $alertArticles[] = $a;
+            }
+        }
+        unset($a);
+
         // Compute total and unreadCount BEFORE slicing so the "N new items" banner
         // reflects the full deduplicated result, not just the current page.
         $total       = count($articles);

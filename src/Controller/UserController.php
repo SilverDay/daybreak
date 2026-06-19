@@ -242,6 +242,61 @@ final class UserController
         exit;
     }
 
+    public function showWatch(array $args = []): void
+    {
+        AuthService::requireAuth();
+        $userId = (int) AuthService::currentUser()['id'];
+
+        $watchTerms = Database::query(
+            'SELECT id, term FROM user_watch_terms WHERE user_id = ? ORDER BY created_at ASC',
+            [$userId]
+        )->fetchAll();
+
+        $title       = 'Watch Terms';
+        $settingsNav = 'watch';
+
+        header('Content-Type: text/html; charset=utf-8');
+        include DB_ROOT . '/src/View/settings_layout.php';
+        include DB_ROOT . '/src/View/user/watch.php';
+        include DB_ROOT . '/src/View/settings_layout_end.php';
+    }
+
+    public function handleWatch(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+
+        $userId = (int) AuthService::currentUser()['id'];
+        $action = $_POST['action'] ?? '';
+
+        if ($action === 'add') {
+            $term = trim((string) ($_POST['term'] ?? ''));
+            if ($term === '' || mb_strlen($term) > 120) {
+                $_SESSION['flash_error'] = 'Term must be 1–120 characters.';
+            } else {
+                Database::query(
+                    'INSERT INTO user_watch_terms (user_id, term) VALUES (?, ?)
+                     ON DUPLICATE KEY UPDATE term = term',
+                    [$userId, $term]
+                );
+                $_SESSION['flash'] = 'Watch term added.';
+            }
+        } elseif ($action === 'remove') {
+            $termId = (int) ($_POST['term_id'] ?? 0);
+            if ($termId > 0) {
+                // WHERE user_id = ? prevents cross-user deletion.
+                Database::query(
+                    'DELETE FROM user_watch_terms WHERE id = ? AND user_id = ?',
+                    [$termId, $userId]
+                );
+            }
+            $_SESSION['flash'] = 'Watch term removed.';
+        }
+
+        header('Location: /settings/watch');
+        exit;
+    }
+
     public function export(array $args = []): void
     {
         AuthService::requireAuth();

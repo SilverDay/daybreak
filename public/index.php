@@ -77,6 +77,10 @@ $router->get('/settings/export',          [UserController::class,  'export']);
 $router->get('/settings/sources',         [UserController::class,  'showSources']);
 $router->post('/settings/sources',         [UserController::class,  'handleSources']);
 
+// ── Watch terms (auth required) ───────────────────────────────────────────────
+$router->get('/settings/watch',           [UserController::class,  'showWatch']);
+$router->post('/settings/watch',           [UserController::class,  'handleWatch']);
+
 // ── Source suggestions ────────────────────────────────────────────────────────
 $router->get('/suggest',              [SuggestController::class, 'show']);
 $router->post('/suggest',              [SuggestController::class, 'handle']);
