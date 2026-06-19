@@ -60,6 +60,9 @@ $router->post('/password/forgot',        [AuthController::class,  'handleForgot'
 $router->get('/password/reset/{token}', [AuthController::class,  'showReset']);
 $router->post('/password/reset/{token}', [AuthController::class,  'handleReset']);
 
+// ── Personal RSS (token auth, no session required) ────────────────────────────
+$router->get('/feed/rss',                  [FeedController::class,  'rss']);
+
 // ── Personalised feed (auth required) ─────────────────────────────────────────
 $router->get('/feed',                      [FeedController::class,  'feed']);
 $router->get('/feed/category/{slug}',      [FeedController::class,  'feed']);

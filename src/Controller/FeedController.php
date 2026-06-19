@@ -210,6 +210,111 @@ final class FeedController
         include DB_ROOT . '/src/View/layout_end.php';
     }
 
+    public function rss(array $args = []): void
+    {
+        $rawToken = (string) ($_GET['token'] ?? '');
+        if ($rawToken === '') {
+            http_response_code(401);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Missing token.';
+            return;
+        }
+
+        $tokenHash = hash('sha256', $rawToken);
+        $user = Database::query(
+            'SELECT u.* FROM user_feed_tokens t
+             JOIN users u ON u.id = t.user_id
+             WHERE t.token_hash = ?',
+            [$tokenHash]
+        )->fetch();
+
+        if (!$user) {
+            http_response_code(401);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Invalid token.';
+            return;
+        }
+
+        $userId = (int) $user['id'];
+
+        $rawLangPref    = $user['preferred_languages'] ?? null;
+        $preferredLangs = (is_string($rawLangPref) && $rawLangPref !== '')
+            ? (json_decode($rawLangPref, true) ?? []) : [];
+        $langJoin   = '';
+        $langParams = [];
+        if (is_array($preferredLangs) && $preferredLangs !== []) {
+            $placeholders = implode(',', array_fill(0, count($preferredLangs), '?'));
+            $langJoin   = "AND (s.language IS NULL OR s.language IN ({$placeholders}))";
+            $langParams = array_values($preferredLangs);
+        }
+
+        $params   = $langParams;
+        $params[] = $userId;
+
+        $articles = DedupService::group(Database::query(
+            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
+                    s.name AS source_name, s.attribution_text,
+                    c.name AS category, c.color
+             FROM articles a
+             JOIN sources s ON s.id = a.source_id
+                 AND s.status IN ('active', 'degraded')
+                 AND s.adapter_type IN ('rss_atom', 'json_api')
+                 {$langJoin}
+             LEFT JOIN source_categories c ON c.id = s.category_id
+             LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?
+             WHERE (us.enabled IS NULL OR us.enabled = 1)
+               AND a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+             ORDER BY a.published_at DESC
+             LIMIT 50",
+            $params
+        )->fetchAll());
+
+        $appUrl  = rtrim((string) (\Daybreak\Config::get('APP_URL', '') ?? ''), '/');
+        $feedUrl = $appUrl . '/feed/rss?token=' . rawurlencode($rawToken);
+
+        header('Content-Type: application/rss+xml; charset=utf-8');
+        header('Cache-Control: private, max-age=300');
+        header('X-Robots-Tag: noindex');
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">' . "\n";
+        echo '<channel>' . "\n";
+        echo '  <title>Daybreak Security Feed</title>' . "\n";
+        echo '  <link>' . htmlspecialchars($appUrl . '/feed', ENT_XML1) . '</link>' . "\n";
+        echo '  <description>Personalised security news from Daybreak</description>' . "\n";
+        echo '  <language>en</language>' . "\n";
+        echo '  <ttl>5</ttl>' . "\n";
+        echo '  <atom:link href="' . htmlspecialchars($feedUrl, ENT_XML1) . '" rel="self" type="application/rss+xml"/>' . "\n";
+        echo '  <lastBuildDate>' . date(DATE_RSS) . '</lastBuildDate>' . "\n";
+
+        foreach ($articles as $a) {
+            $pubDate = !empty($a['published_at'])
+                ? date(DATE_RSS, strtotime($a['published_at']))
+                : date(DATE_RSS);
+            $guid = 'daybreak:' . ($a['dedup_key'] ?? hash('sha256', $a['url']));
+            $desc = '';
+            if (!empty($a['summary'])) {
+                $desc .= \Daybreak\Security\Html::sanitizeSummary((string) $a['summary'], 500);
+            }
+            if (!empty($a['attribution_text'])) {
+                $desc .= ($desc !== '' ? '<br><br>' : '') . htmlspecialchars($a['attribution_text'], ENT_XML1);
+            }
+
+            echo '  <item>' . "\n";
+            echo '    <title><![CDATA[' . $a['title'] . ']]></title>' . "\n";
+            echo '    <link>' . htmlspecialchars($a['url'], ENT_XML1) . '</link>' . "\n";
+            echo '    <guid isPermaLink="false">' . htmlspecialchars($guid, ENT_XML1) . '</guid>' . "\n";
+            echo '    <pubDate>' . htmlspecialchars($pubDate, ENT_XML1) . '</pubDate>' . "\n";
+            if ($desc !== '') {
+                echo '    <description><![CDATA[' . $desc . ']]></description>' . "\n";
+            }
+            echo '  </item>' . "\n";
+        }
+
+        echo '</channel>' . "\n";
+        echo '</rss>' . "\n";
+    }
+
     public function markSeen(array $args = []): void
     {
         AuthService::requireAuth();

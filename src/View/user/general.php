@@ -84,6 +84,53 @@ use Daybreak\Security\Csrf;
   </section>
 
   <section class="settings-section">
+    <h2 class="settings-section-title">Personal RSS feed</h2>
+    <p class="form-hint" style="margin-bottom:1rem">
+      Subscribe to your personalised feed in any RSS reader.
+      The URL contains a secret token &mdash; treat it like a password.
+    </p>
+
+    <?php if (($rssTokenRaw ?? null) !== null): ?>
+      <p class="form-hint" style="margin-bottom:0.5rem">
+        <strong>Copy this URL now &mdash; it will not be shown again.</strong>
+      </p>
+      <code class="rss-url-box"><?= Html::e(($rssBaseUrl ?? '') . '?token=' . $rssTokenRaw) ?></code>
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+        <form method="post" action="/settings/account">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="rss_generate">
+          <button type="submit" class="btn btn-secondary">Regenerate</button>
+        </form>
+        <form method="post" action="/settings/account">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="rss_revoke">
+          <button type="submit" class="btn btn-secondary">Revoke</button>
+        </form>
+      </div>
+    <?php elseif ($hasRssToken ?? false): ?>
+      <p class="form-hint" style="margin-bottom:0.75rem">Token active. URL was shown on generation.</p>
+      <div style="display:flex;gap:0.5rem">
+        <form method="post" action="/settings/account">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="rss_generate">
+          <button type="submit" class="btn btn-secondary">Regenerate</button>
+        </form>
+        <form method="post" action="/settings/account">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="rss_revoke">
+          <button type="submit" class="btn btn-secondary">Revoke</button>
+        </form>
+      </div>
+    <?php else: ?>
+      <form method="post" action="/settings/account">
+        <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+        <input type="hidden" name="action" value="rss_generate">
+        <button type="submit" class="btn btn-primary">Generate RSS feed URL</button>
+      </form>
+    <?php endif; ?>
+  </section>
+
+  <section class="settings-section">
     <h2 class="settings-section-title">Data export</h2>
     <p class="form-hint">Download a copy of your personal data (DSGVO Art. 20).</p>
     <a href="/settings/export" class="btn btn-primary">Download data</a>

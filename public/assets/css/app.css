@@ -2526,3 +2526,16 @@ textarea:focus-visible {
 .watch-term-list { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .watch-term-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9375rem; }
 .watch-term-item span { flex: 1; }
+
+/* ── RSS URL display ──────────────────────────────────────────────────────────── */
+.rss-url-box {
+  display: block;
+  font-family: monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  user-select: all;
+}

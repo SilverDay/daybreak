@@ -19,6 +19,24 @@ final class UserController
         $user        = AuthService::currentUser();
         $userId      = (int) ($user['id'] ?? 0);
         $hasKiojuKey = KiojuService::hasApiKey($userId);
+
+        $hasRssToken = Database::query(
+            'SELECT 1 FROM user_feed_tokens WHERE user_id = ?', [$userId]
+        )->fetchColumn() !== false;
+        $rssTokenRaw = $_SESSION['rss_token_raw'] ?? null;
+        if ($rssTokenRaw !== null) {
+            unset($_SESSION['rss_token_raw']);
+        }
+        $appUrl = rtrim((string) (\Daybreak\Config::get('APP_URL', '') ?? ''), '/');
+        if ($appUrl === '') {
+            $scheme = (($_SERVER['HTTPS'] ?? '') === 'on') ? 'https' : 'http';
+            $host   = (string) ($_SERVER['HTTP_HOST'] ?? '');
+            if (preg_match('/\A[a-z0-9.-]+(?::\d{1,5})?\z/i', $host) === 1) {
+                $appUrl = $scheme . '://' . $host;
+            }
+        }
+        $rssBaseUrl = $appUrl . '/feed/rss';
+
         $title       = 'General';
         $settingsNav = 'general';
 
@@ -96,6 +114,20 @@ final class UserController
         } elseif ($action === 'kioju_remove') {
             KiojuService::clearApiKey($userId);
             $_SESSION['flash'] = 'Kioju API key removed.';
+        } elseif ($action === 'rss_generate') {
+            $rawToken  = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $rawToken);
+            Database::query(
+                'INSERT INTO user_feed_tokens (user_id, token_hash) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), created_at = NOW()',
+                [$userId, $tokenHash]
+            );
+            $_SESSION['rss_token_raw'] = $rawToken;
+            header('Location: /settings/account');
+            exit;
+        } elseif ($action === 'rss_revoke') {
+            Database::query('DELETE FROM user_feed_tokens WHERE user_id = ?', [$userId]);
+            $_SESSION['flash'] = 'RSS feed token revoked.';
         }
 
         header('Location: /settings/account');
