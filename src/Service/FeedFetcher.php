@@ -17,7 +17,7 @@ use RuntimeException;
 final class FeedFetcher implements FetchClient
 {
     private const MAX_REDIRECTS = 4;
-    private const TIMEOUT_S     = 18;
+    private const TIMEOUT_S     = 20;
     private const MAX_BYTES     = 8 * 1024 * 1024; // 8 MB cap
 
     public function __construct(private readonly string $userAgent = '') {}
@@ -32,14 +32,16 @@ final class FeedFetcher implements FetchClient
     /**
      * @return array{status:int,body:string,etag:?string,last_modified:?string,not_modified:bool}
      */
-    public function get(string $url, ?string $etag = null, ?string $lastModified = null): array
+    public function get(string $url, ?string $etag = null, ?string $lastModified = null, array $extraHeaders = []): array
     {
         $redirects = 0;
         while (true) {
             SsrfGuard::assertSafe($url);
 
             $ch = curl_init($url);
-            $headers = ['Accept: application/rss+xml, application/atom+xml, application/xml, application/json;q=0.9, */*;q=0.5'];
+            $headers = $extraHeaders !== []
+                ? $extraHeaders
+                : ['Accept: application/rss+xml, application/atom+xml, application/xml, application/json;q=0.9, */*;q=0.5'];
             if ($etag) {
                 $headers[] = 'If-None-Match: ' . $etag;
             }
@@ -58,7 +60,10 @@ final class FeedFetcher implements FetchClient
                 CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
                 CURLOPT_BUFFERSIZE     => 16384,
                 CURLOPT_NOPROGRESS     => false,
-                CURLOPT_PROGRESSFUNCTION => static function ($ch, $dlTotal, $dlNow) {
+                // OpenSSL 1.1.1f (Ubuntu 20.04) hangs on TLS 1.3 HelloRetryRequest from
+                // Cloudflare-fronted hosts (e.g. NVD). TLS 1.2 is secure and universally supported.
+                CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2 | CURL_SSLVERSION_MAX_TLSv1_2,
+                CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                     return $dlNow > self::MAX_BYTES ? 1 : 0; // abort oversized responses
                 },
             ]);
@@ -128,7 +133,7 @@ final class FeedFetcher implements FetchClient
             CURLOPT_NOPROGRESS     => false,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($data),
-            CURLOPT_PROGRESSFUNCTION => static function ($ch, $dlTotal, $dlNow) {
+            CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                 return $dlNow > self::MAX_BYTES ? 1 : 0;
             },
         ]);

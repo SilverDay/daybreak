@@ -14,8 +14,9 @@ $force  = isset($opts['force']);
 $slug   = $opts['source'] ?? null;
 
 // Global lock to prevent overlapping runs.
-$lock = fopen(DB_ROOT . '/storage/fetch.lock', 'c');
-if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+// GET_LOCK is session-scoped: MariaDB auto-releases it if this process dies.
+$acquired = Database::query("SELECT GET_LOCK('daybreak_fetch', 0)")->fetchColumn();
+if ($acquired !== '1' && $acquired !== 1) {
     fwrite(STDERR, "another fetch run is in progress\n");
     exit(1);
 }
@@ -35,4 +36,4 @@ if ($slug !== null) {
     echo "done: {$r['ok']} ok, {$r['errors']} errors\n";
 }
 
-flock($lock, LOCK_UN);
+Database::query("SELECT RELEASE_LOCK('daybreak_fetch')");

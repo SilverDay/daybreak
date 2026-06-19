@@ -67,8 +67,9 @@ final class AuthController
 
         $email    = trim($_POST['email']    ?? '');
         $password = $_POST['password']      ?? '';
+        $remember = isset($_POST['remember_me']);
 
-        if (!AuthService::login($email, $password)) {
+        if (!AuthService::login($email, $password, $remember)) {
             $_SESSION['flash_error'] = 'Invalid credentials or account not verified. '
                 . 'Please check your email and password.';
             header('Location: /login');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Daybreak\Controller;
 
 use Daybreak\Database;
-use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\DedupService;
 use Daybreak\Service\KiojuService;
@@ -15,6 +14,19 @@ final class PublicController
 {
     public function home(array $args = []): void
     {
+        $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+        $isPublicRoute = str_starts_with($requestPath, '/public');
+
+        // Redirect logged-in users away from the bare home page to their feed.
+        // The /public route is explicitly opt-in and never redirects.
+        if (!$isPublicRoute && AuthService::currentUser() !== null) {
+            header('Location: /feed');
+            exit;
+        }
+
+        $allFeedUrl  = $isPublicRoute ? '/public' : '/';
+        $catFeedBase = $isPublicRoute ? '/public/category/' : '/category/';
+
         $windowDays     = max(1, min(30, (int) ($_GET['days'] ?? 1)));
         $activeCategory = isset($args['slug']) && $args['slug'] !== '' ? $args['slug'] : null;
 
@@ -50,7 +62,8 @@ final class PublicController
 
         $articles = DedupService::group(Database::query(
             "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
-                    s.name AS source_name, s.attribution_text,
+                    s.name AS source_name, s.attribution_text, s.status AS source_status,
+                    s.last_recovered_at,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
              JOIN sources s ON s.id = a.source_id
@@ -64,26 +77,26 @@ final class PublicController
             $params
         )->fetchAll());
 
-        // Ransomlook widget: last 7 days, 20 most recent.
+        // Ransomlook widget: respect the same time window as the main feed.
         $ransomlookItems = Database::query(
             "SELECT a.title, a.url, a.published_at
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'ransomlook'
-             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
              ORDER BY a.published_at DESC
-               LIMIT 10"
+               LIMIT 50",
+            [$windowDays]
         )->fetchAll();
 
-        // CVE widget: most recent 15, no date filter.
-        // The NVD adapter stores at most 20 items per run so the table stays small;
-        // dropping the window prevents the widget going empty when the data is right
-        // at the 7-day boundary or the cron has been delayed.
+        // CVE widget: show the most recently catalogued entries regardless of time window.
+        // CISA KEV dateAdded values reflect when CISA listed the CVE, not a publication date,
+        // so filtering by the feed's time window would exclude all entries.
         $cveItems = Database::query(
             "SELECT a.title, a.url, a.summary, a.published_at
              FROM articles a
-             JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
+             JOIN sources s ON s.id = a.source_id AND s.adapter_type IN ('nvd','cisa_kev')
              ORDER BY a.published_at DESC
-               LIMIT 10"
+               LIMIT 50"
         )->fetchAll();
 
         // Page title: category name or 'Latest'.
@@ -93,7 +106,7 @@ final class PublicController
         } else {
             $title = 'Latest';
         }
-        $activeNav = 'feed';
+        $activeNav = $isPublicRoute ? 'public' : 'feed';
         $showWidgets = true;
 
         $currentUser = AuthService::currentUser();
@@ -112,7 +125,7 @@ final class PublicController
     {
         $categorySlug = isset($_GET['category']) ? mb_substr(trim((string) $_GET['category']), 0, 64) : null;
         $searchQuery = $this->normalizeSourceSearchQuery($_GET['q'] ?? '');
-        $sortKey = $this->normalizeSourceSort($_GET['sort'] ?? 'total');
+        $sortKey = $this->normalizeSourceSort($_GET['sort'] ?? 'name');
 
         $categories = Database::query(
             'SELECT id, name, slug, color FROM source_categories ORDER BY sort_order'
@@ -159,6 +172,8 @@ final class PublicController
                 s.homepage_url,
                 s.adapter_type,
                 s.status,
+                s.last_success_at,
+                s.last_recovered_at,
                 c.name AS category_name,
                 c.slug AS category_slug,
                 COUNT(a.id) AS total_articles,
@@ -170,7 +185,8 @@ final class PublicController
              LEFT JOIN source_categories c ON c.id = s.category_id
              LEFT JOIN articles a ON a.source_id = s.id
                          WHERE " . implode(' AND ', $whereParts) . "
-             GROUP BY s.id, s.name, s.slug, s.homepage_url, s.adapter_type, s.status, c.name, c.slug
+             GROUP BY s.id, s.name, s.slug, s.homepage_url, s.adapter_type, s.status,
+                      s.last_success_at, s.last_recovered_at, c.name, c.slug
                          ORDER BY {$orderSql}",
             $params
         )->fetchAll();

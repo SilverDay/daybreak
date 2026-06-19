@@ -41,13 +41,13 @@ $relativeAge = static function (?string $raw) use ($now): string {
   <table class="admin-table">
     <thead>
       <tr>
-        <th>Name</th>
-        <th>Slug</th>
-        <th>Category</th>
-        <th>Adapter</th>
-        <th>Status</th>
-        <th class="num">Failures</th>
-        <th>Last success</th>
+        <th data-sort="text" data-sort-dir="asc">Name</th>
+        <th data-sort="text">Slug</th>
+        <th data-sort="text">Category</th>
+        <th data-sort="text">Adapter</th>
+        <th data-sort="text">Status</th>
+        <th class="num" data-sort="num">Failures</th>
+        <th data-sort="date">Last success</th>
         <th>Last fetch health</th>
         <th></th>
       </tr>
@@ -78,7 +78,8 @@ $relativeAge = static function (?string $raw) use ($now): string {
           <td class="text-sm"><code><?= Html::e($src['adapter_type']) ?></code></td>
           <td><span class="status-pill status-pill--<?= Html::e($src['status']) ?>"><?= Html::e($src['status']) ?></span></td>
           <td class="num <?= $failures > 0 ? 'text-danger ' : '' ?><?= $riskClass ?>"><?= $failures ?></td>
-          <td class="<?= $isStale ? 'text-danger' : 'text-secondary' ?> text-sm">
+          <td class="<?= $isStale ? 'text-danger' : 'text-secondary' ?> text-sm"
+              data-sort-value="<?= Html::e($lastSuccessRaw ?? '') ?>">
             <strong><?= Html::e($lastSuccessRelative) ?></strong>
             <div class="text-secondary"><?= Html::e($src['last_success_at'] ? (new DateTimeImmutable($src['last_success_at']))->format('M j, H:i') : '—') ?></div>
           </td>

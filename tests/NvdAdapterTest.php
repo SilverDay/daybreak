@@ -11,10 +11,18 @@ final class NvdAdapterTest extends TestCase
     public function testFetchMapsNvdItems(): void
     {
         $baseUrl = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
-        $requestUrl = $this->nvdRequestUrl($baseUrl);
+        $probeUrl = $this->nvdProbeUrl($baseUrl);
+        $pageUrl  = $this->nvdPageUrl($baseUrl, 0);
 
         $fetcher = new FakeFetchClient([
-            $requestUrl => [
+            $probeUrl => [
+                'status' => 200,
+                'body' => json_encode(['totalResults' => 1], JSON_THROW_ON_ERROR),
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+            $pageUrl => [
                 'status' => 200,
                 'body' => json_encode([
                     'vulnerabilities' => [[
@@ -55,18 +63,29 @@ final class NvdAdapterTest extends TestCase
             $result->items[0]->summary
         );
         $this->assertSame('2026-06-10 08:00:00', $result->items[0]->publishedAt?->format('Y-m-d H:i:s'));
-        $this->assertSame($requestUrl, $fetcher->calls[0]['url']);
+        $this->assertSame($probeUrl, $fetcher->calls[0]['url']);
+        $this->assertSame($pageUrl, $fetcher->calls[1]['url']);
     }
 
     public function testFetchReturnsEmptyResultForInvalidPayload(): void
     {
         $baseUrl = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
-        $requestUrl = $this->nvdRequestUrl($baseUrl);
+        $probeUrl = $this->nvdProbeUrl($baseUrl);
+        $pageUrl  = $this->nvdPageUrl($baseUrl, 0);
+
+        $invalidBody = json_encode(['unexpected' => true], JSON_THROW_ON_ERROR);
 
         $fetcher = new FakeFetchClient([
-            $requestUrl => [
+            $probeUrl => [
                 'status' => 200,
-                'body' => json_encode(['unexpected' => true], JSON_THROW_ON_ERROR),
+                'body' => $invalidBody,
+                'etag' => null,
+                'last_modified' => null,
+                'not_modified' => false,
+            ],
+            $pageUrl => [
+                'status' => 200,
+                'body' => $invalidBody,
                 'etag' => null,
                 'last_modified' => null,
                 'not_modified' => false,
@@ -82,15 +101,22 @@ final class NvdAdapterTest extends TestCase
         $this->assertSame(200, $result->httpStatus);
     }
 
-    private function nvdRequestUrl(string $baseUrl): string
+    private function nvdDateParams(): string
     {
         $tz = new \DateTimeZone('UTC');
         $start = (new \DateTimeImmutable('-7 days', $tz))->format('Y-m-d\TH:i:s.000');
         $end = (new \DateTimeImmutable('now', $tz))->format('Y-m-d\TH:i:s.000');
 
-        return rtrim($baseUrl, '?&')
-            . '?pubStartDate=' . urlencode($start)
-            . '&pubEndDate=' . urlencode($end)
-            . '&resultsPerPage=20';
+        return '?pubStartDate=' . urlencode($start) . '&pubEndDate=' . urlencode($end);
+    }
+
+    private function nvdProbeUrl(string $baseUrl): string
+    {
+        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=1';
+    }
+
+    private function nvdPageUrl(string $baseUrl, int $startIndex): string
+    {
+        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=20&startIndex=' . $startIndex;
     }
 }

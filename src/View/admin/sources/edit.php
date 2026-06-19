@@ -20,11 +20,31 @@ $s = $source ?? [
   'category_id' => null,
   'attribution_text' => '',
   'license' => '',
+  'language' => null,
   'fetch_interval_min' => 15,
   'field_map' => '',
   'status' => 'pending',
   'consecutive_failures' => 0,
   'last_error' => null,
+];
+$languageOptions = [
+  'en' => 'English',
+  'de' => 'German',
+  'fr' => 'French',
+  'es' => 'Spanish',
+  'pt' => 'Portuguese',
+  'nl' => 'Dutch',
+  'it' => 'Italian',
+  'ja' => 'Japanese',
+  'zh' => 'Chinese',
+  'ko' => 'Korean',
+  'ru' => 'Russian',
+  'ar' => 'Arabic',
+  'pl' => 'Polish',
+  'sv' => 'Swedish',
+  'fi' => 'Finnish',
+  'da' => 'Danish',
+  'no' => 'Norwegian',
 ];
 ?>
 <div class="admin-page-header">
@@ -87,7 +107,7 @@ $s = $source ?? [
         <div class="form-group">
           <label class="form-label" for="src-adapter">Adapter type</label>
           <select id="src-adapter" class="form-input" name="adapter_type">
-            <?php foreach (['rss_atom', 'json_api', 'ransomlook', 'nvd'] as $a): ?>
+            <?php foreach (['rss_atom', 'json_api', 'ransomlook', 'nvd', 'cisa_kev'] as $a): ?>
               <option value="<?= Html::e($a) ?>" <?= $s['adapter_type'] === $a ? ' selected' : '' ?>><?= Html::e($a) ?></option>
             <?php endforeach; ?>
           </select>
@@ -117,6 +137,17 @@ $s = $source ?? [
           <input id="src-license" class="form-input" type="text" name="license"
             value="<?= Html::e($s['license'] ?? '') ?>" maxlength="120"
             placeholder="e.g. CC BY 4.0">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label" for="src-language">Language</label>
+          <select id="src-language" class="form-input" name="language">
+            <option value="">— unspecified —</option>
+            <?php foreach ($languageOptions as $code => $label): ?>
+              <option value="<?= Html::e($code) ?>"<?= ($s['language'] ?? null) === $code ? ' selected' : '' ?>><?= Html::e($label) ?> (<?= Html::e($code) ?>)</option>
+            <?php endforeach; ?>
+          </select>
         </div>
       </div>
       <div class="form-group" style="max-width:240px">

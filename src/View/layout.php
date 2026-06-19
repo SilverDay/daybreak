@@ -28,6 +28,33 @@ if (!function_exists('relativeTime')) {
   }
 }
 
+if (!function_exists('sourceFreshness')) {
+  /**
+   * Returns one of: fresh | quiet | stale | recovered | degraded | down
+   * based on source status, latest article age, and recovery timestamp.
+   */
+  function sourceFreshness(string $status, ?string $latestArticleAt, ?string $lastRecoveredAt): string
+  {
+    if ($status === 'auto_disabled') return 'down';
+    if ($status === 'degraded')      return 'degraded';
+    if ($status === 'active' && $lastRecoveredAt !== null) {
+      try {
+        $recoveredAgo = time() - (new DateTimeImmutable($lastRecoveredAt, new DateTimeZone('UTC')))->getTimestamp();
+        if ($recoveredAgo >= 0 && $recoveredAgo < 86400) return 'recovered';
+      } catch (\Throwable) {}
+    }
+    if ($latestArticleAt === null) return 'stale';
+    try {
+      $age = time() - (new DateTimeImmutable($latestArticleAt, new DateTimeZone('UTC')))->getTimestamp();
+    } catch (\Throwable) {
+      return 'stale';
+    }
+    if ($age < 86400)  return 'fresh';
+    if ($age < 604800) return 'quiet';
+    return 'stale';
+  }
+}
+
 $_flash    = $_SESSION['flash']       ?? null;
 $_flashErr = $_SESSION['flash_error'] ?? null;
 if ($_flash) {
@@ -121,6 +148,7 @@ $ogType = (string) ($ogType ?? 'website');
   <meta name="twitter:description" content="<?= Html::e($seoDescription) ?>">
   <meta name="twitter:image" content="<?= Html::e($socialImageUrl) ?>">
   <title><?= Html::e($title ?? 'Latest') ?> · Daybreak</title>
+  <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">(function(){var s=localStorage.getItem('daybreak-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}());</script>
   <link rel="stylesheet" href="/assets/css/app.css">
   <script src="/assets/js/app.js" defer></script>
 </head>
@@ -137,11 +165,16 @@ $ogType = (string) ($ogType ?? 'website');
           <a href="/sources" class="site-nav-link<?= ($activeNav ?? '') === 'sources' ? ' site-nav-link--active' : '' ?>">Sources</a>
           <a href="/search" class="site-nav-link<?= ($activeNav ?? '') === 'search' ? ' site-nav-link--active' : '' ?>">Search</a>
           <a href="/suggest" class="site-nav-link site-nav-link--suggest<?= ($activeNav ?? '') === 'suggest' ? ' site-nav-link--active' : '' ?>">Suggest</a>
+          <a href="/public" class="site-nav-link<?= ($activeNav ?? '') === 'public' ? ' site-nav-link--active' : '' ?>">All</a>
           <a href="/feed" class="site-nav-link<?= ($activeNav ?? '') === 'myfeed' ? ' site-nav-link--active' : '' ?>">My Feed</a>
           <?php if ($_currentUser['role'] === 'admin'): ?>
             <a href="/admin" class="site-nav-link">Admin</a>
           <?php endif; ?>
           <a href="/settings/account" class="site-nav-link"><?= Html::e($_currentUser['display_name']) ?></a>
+          <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme">
+            <svg class="theme-toggle-icon theme-toggle-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg class="theme-toggle-icon theme-toggle-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
           <form method="post" action="/logout" class="site-nav-logout">
             <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
             <button type="submit" class="site-nav-btn">Sign out</button>
@@ -149,6 +182,10 @@ $ogType = (string) ($ogType ?? 'website');
         <?php else: ?>
           <a href="/sources" class="site-nav-link<?= ($activeNav ?? '') === 'sources' ? ' site-nav-link--active' : '' ?>">Sources</a>
           <a href="/search" class="site-nav-link<?= ($activeNav ?? '') === 'search' ? ' site-nav-link--active' : '' ?>">Search</a>
+          <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme">
+            <svg class="theme-toggle-icon theme-toggle-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg class="theme-toggle-icon theme-toggle-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
           <a href="/login" class="site-nav-link site-nav-link--cta site-nav-link--cta-primary">Sign in</a>
           <a href="/register" class="site-nav-link site-nav-link--cta site-nav-link--cta-subtle">Register</a>
         <?php endif; ?>

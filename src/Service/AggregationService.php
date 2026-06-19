@@ -9,6 +9,7 @@ use Daybreak\Adapter\SourceAdapter;
 use Daybreak\Adapter\RssAtomAdapter;
 use Daybreak\Adapter\RansomlookAdapter;
 use Daybreak\Adapter\NvdAdapter;
+use Daybreak\Adapter\CisaKevAdapter;
 use Daybreak\Adapter\JsonApiAdapter;
 use Throwable;
 
@@ -27,15 +28,15 @@ final class AggregationService
 
     public function __construct(private readonly FeedFetcher $fetcher)
     {
-        $this->adapters = [new RssAtomAdapter(), new RansomlookAdapter(), new NvdAdapter(), new JsonApiAdapter()];
+        $this->adapters = [new RssAtomAdapter(), new RansomlookAdapter(), new NvdAdapter(), new CisaKevAdapter(), new JsonApiAdapter()];
     }
 
     /** @return array{ok:int,errors:int} */
     public function runDue(bool $force = false): array
     {
         $sql = $force
-            ? "SELECT * FROM sources WHERE status IN ('active','degraded')"
-            : "SELECT * FROM sources WHERE status IN ('active','degraded') AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())";
+            ? "SELECT * FROM sources WHERE status IN ('active','degraded','pending')"
+            : "SELECT * FROM sources WHERE status IN ('active','degraded','pending') AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())";
         $sources = Database::query($sql)->fetchAll();
 
         $ok = 0;
@@ -100,7 +101,7 @@ final class AggregationService
         $stmt = Database::query(
             'INSERT INTO articles (source_id, guid, title, url, summary, published_at, dedup_key)
              VALUES (?,?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE title = VALUES(title), summary = VALUES(summary)',
+             ON DUPLICATE KEY UPDATE title = VALUES(title), summary = VALUES(summary), published_at = VALUES(published_at)',
             [
                 $sourceId,
                 mb_substr($item->guid, 0, 500),
@@ -209,8 +210,9 @@ final class AggregationService
     private function markSuccess(array $source, ?string $etag, ?string $lastModified): void
     {
         Database::query(
-            "UPDATE sources SET status = IF(status='degraded','active',status),
+            "UPDATE sources SET status = IF(status IN ('degraded','pending'),'active',status),
                 consecutive_failures = 0, last_fetch_at = NOW(), last_success_at = NOW(),
+                last_recovered_at = IF(status='degraded', NOW(), last_recovered_at),
                 last_error = NULL, etag = ?, last_modified_hdr = ?,
                 next_fetch_at = DATE_ADD(NOW(), INTERVAL fetch_interval_min MINUTE)
              WHERE id = ?",

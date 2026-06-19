@@ -62,11 +62,31 @@ final class FeedController
         // sinceQuery = true when we actually filter by the previous-visit timestamp.
         $sinceQuery = $sinceMode && ($lastSeen !== null);
 
-        // Build query params: user_id first (consumed by LEFT JOIN ON clause).
-        $params = [$userId];
+        // Build language filter from user preference.
+        $rawLangPref = $user['preferred_languages'] ?? null;
+        $preferredLangs = (is_string($rawLangPref) && $rawLangPref !== '')
+            ? (json_decode($rawLangPref, true) ?? [])
+            : [];
+        $langJoin = '';
+        $langParams = [];
+        if (is_array($preferredLangs) && $preferredLangs !== []) {
+            $placeholders = implode(',', array_fill(0, count($preferredLangs), '?'));
+            $langJoin = "AND (s.language IS NULL OR s.language IN ({$placeholders}))";
+            $langParams = array_values($preferredLangs);
+        }
+
+        // Param order must match the SQL binding order:
+        // 1. lang placeholders (in JOIN sources clause)
+        // 2. $userId (in LEFT JOIN user_sources ON clause)
+        // 3. date param (in WHERE)
+        // 4. category param (in WHERE, optional)
+        $params = $langParams;
+        $params[] = $userId;
 
         if ($sinceQuery) {
-            $dateWhere = 'AND a.published_at > ?';
+            // Use fetched_at (when the article arrived in the DB), not published_at.
+            // published_at can predate last_seen_at for sources like CISA KEV or backdated RSS items.
+            $dateWhere = 'AND a.fetched_at > ?';
             $params[]  = $lastSeen;
         } else {
             $dateWhere = 'AND a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)';
@@ -87,6 +107,7 @@ final class FeedController
              JOIN sources s ON s.id = a.source_id
                  AND s.status IN ('active', 'degraded')
                  AND s.adapter_type IN ('rss_atom', 'json_api')
+                 {$langJoin}
              LEFT JOIN source_categories c ON c.id = s.category_id
              LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?
              WHERE (us.enabled IS NULL OR us.enabled = 1)
@@ -111,7 +132,7 @@ final class FeedController
         $cveItems = Database::query(
             "SELECT a.title, a.url, a.summary, a.published_at
              FROM articles a
-             JOIN sources s ON s.id = a.source_id AND s.adapter_type = 'nvd'
+             JOIN sources s ON s.id = a.source_id AND s.adapter_type IN ('nvd','cisa_kev')
                ORDER BY a.published_at DESC LIMIT 10"
         )->fetchAll();
 

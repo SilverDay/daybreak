@@ -53,8 +53,8 @@ if (!function_exists('cveSeverityFromSummary')) {
     <div class="widget">
         <div class="widget-header">
             <h2 class="widget-title">Recent CVEs</h2>
-            <a href="https://nvd.nist.gov/" target="_blank" rel="noopener noreferrer nofollow"
-                class="widget-attribution">NVD / NIST</a>
+            <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener noreferrer nofollow"
+                class="widget-attribution">CISA KEV</a>
         </div>
         <div class="widget-body">
             <p class="widget-scroll-hint" aria-hidden="true">Scroll for more</p>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Daybreak\Security\Html;
 use Daybreak\Security\Csrf;
+use Daybreak\Service\AuthService;
 use Daybreak\Config;
 
 $_flash    = $_SESSION['flash']       ?? null;
@@ -14,6 +15,9 @@ if ($_flash) {
 if ($_flashErr) {
   unset($_SESSION['flash_error']);
 }
+
+$_currentUser  = AuthService::currentUser();
+$_settingsNav  = $settingsNav ?? '';
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $canonicalPath = (string) ($canonicalPath ?? $requestPath);
@@ -45,8 +49,8 @@ $canonicalUrl = $siteBaseUrl !== '' ? $siteBaseUrl . $canonicalPath : $canonical
 $socialImagePath = '/assets/images/daybreak-logo.png';
 $socialImageUrl = $siteBaseUrl !== '' ? $siteBaseUrl . $socialImagePath : $socialImagePath;
 
-$seoTitle = (string) ($seoTitle ?? (($title ?? 'Daybreak') . ' · Daybreak'));
-$seoDescription = (string) ($seoDescription ?? 'Authentication pages for Daybreak.');
+$seoTitle = (string) ($seoTitle ?? (($title ?? 'Settings') . ' · Daybreak'));
+$seoDescription = (string) ($seoDescription ?? 'Account settings for Daybreak.');
 ?>
 <!doctype html>
 <html lang="en">
@@ -71,28 +75,48 @@ $seoDescription = (string) ($seoDescription ?? 'Authentication pages for Daybrea
   <meta name="twitter:title" content="<?= Html::e($seoTitle) ?>">
   <meta name="twitter:description" content="<?= Html::e($seoDescription) ?>">
   <meta name="twitter:image" content="<?= Html::e($socialImageUrl) ?>">
-  <title><?= Html::e($title ?? 'Daybreak') ?> · Daybreak</title>
+  <title><?= Html::e($title ?? 'Settings') ?> · Daybreak</title>
   <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">(function(){var s=localStorage.getItem('daybreak-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}());</script>
   <link rel="stylesheet" href="/assets/css/app.css">
+  <script src="/assets/js/app.js" defer></script>
 </head>
 
-<body>
+<body class="admin-body">
 
   <header class="site-header">
     <div class="site-header-inner">
       <a href="/" class="logo" aria-label="Daybreak home">
         <img src="<?= Html::e($socialImagePath) ?>" alt="Daybreak" class="logo-image">
       </a>
+      <nav class="site-nav" aria-label="User navigation">
+        <a href="/" class="site-nav-link">View Site</a>
+        <a href="/settings/account" class="site-nav-link"><?= Html::e($_currentUser['display_name'] ?? '') ?></a>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme">
+          <svg class="theme-toggle-icon theme-toggle-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="theme-toggle-icon theme-toggle-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <form method="post" action="/logout" class="site-nav-logout">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <button type="submit" class="site-nav-btn">Sign out</button>
+        </form>
+      </nav>
     </div>
   </header>
 
-  <main class="auth-main">
-    <div class="auth-card">
-      <h1 class="auth-title"><?= Html::e($title ?? '') ?></h1>
+  <div class="admin-subnav">
+    <div class="admin-subnav-inner">
+      <a href="/settings/account"  class="admin-nav-link<?= $_settingsNav === 'general'  ? ' is-active' : '' ?>">General</a>
+      <a href="/settings/security" class="admin-nav-link<?= $_settingsNav === 'security' ? ' is-active' : '' ?>">Security</a>
+      <a href="/settings/sources"  class="admin-nav-link<?= $_settingsNav === 'feed'     ? ' is-active' : '' ?>">Edit feed</a>
+    </div>
+  </div>
 
-      <?php if ($_flash): ?>
-        <div class="flash flash-success"><?= Html::e($_flash) ?></div>
-      <?php endif; ?>
-      <?php if ($_flashErr): ?>
-        <div class="flash flash-error"><?= Html::e($_flashErr) ?></div>
-      <?php endif; ?>
+  <?php if ($_flash || $_flashErr): ?>
+    <div class="flash-wrap">
+      <?php if ($_flash): ?><div class="flash flash-success"><?= Html::e($_flash) ?></div><?php endif; ?>
+      <?php if ($_flashErr): ?><div class="flash flash-error"><?= Html::e($_flashErr) ?></div><?php endif; ?>
+    </div>
+  <?php endif; ?>
+
+  <main class="admin-main">
+    <div class="admin-content">

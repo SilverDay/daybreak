@@ -1,3 +1,82 @@
+// Client-side sortable tables.
+// Any <th data-sort="text|num|date"> becomes a clickable sort header.
+// <td data-sort-value="..."> overrides cell text for sorting (used for date columns).
+(function () {
+    function cellValue(cell, type) {
+        if (type === 'date') {
+            return cell.getAttribute('data-sort-value') || '';
+        }
+        if (type === 'num') {
+            return parseFloat(cell.textContent.trim()) || 0;
+        }
+        return cell.textContent.trim().toLowerCase();
+    }
+
+    function sortTable(table, colIndex, type, dir) {
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        var rows = Array.from(tbody.rows).filter(function (r) {
+            return !r.querySelector('td[colspan]');
+        });
+        rows.sort(function (a, b) {
+            var va = cellValue(a.cells[colIndex], type);
+            var vb = cellValue(b.cells[colIndex], type);
+            if (type === 'date') {
+                if (va === '' && vb === '') return 0;
+                if (va === '') return 1;
+                if (vb === '') return -1;
+            }
+            if (va < vb) return -dir;
+            if (va > vb) return dir;
+            return 0;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+    }
+
+    function initSortableTable(table) {
+        var headers = Array.from(table.querySelectorAll('thead th[data-sort]'));
+        if (!headers.length) return;
+
+        var activeCol = -1;
+        var activeDir = 1;
+
+        // Reflect any data-sort-dir pre-set in HTML (server-rendered default order).
+        headers.forEach(function (th, i) {
+            if (th.hasAttribute('data-sort-dir')) {
+                activeCol = i;
+                activeDir = th.getAttribute('data-sort-dir') === 'desc' ? -1 : 1;
+            }
+        });
+
+        headers.forEach(function (th, i) {
+            th.setAttribute('tabindex', '0');
+            th.setAttribute('role', 'button');
+
+            function doSort() {
+                var type = th.getAttribute('data-sort');
+                if (activeCol === i) {
+                    activeDir = -activeDir;
+                } else {
+                    activeCol = i;
+                    activeDir = (type === 'num' || type === 'date') ? -1 : 1;
+                }
+                sortTable(table, i, type, activeDir);
+                headers.forEach(function (h) { h.removeAttribute('data-sort-dir'); });
+                th.setAttribute('data-sort-dir', activeDir === 1 ? 'asc' : 'desc');
+            }
+
+            th.addEventListener('click', doSort);
+            th.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doSort(); }
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.admin-table').forEach(initSortableTable);
+    });
+})();
+
 document.addEventListener('DOMContentLoaded', function () {
     // Auto-submit time-window dropdown on change.
     var sel = document.getElementById('window-days');
@@ -25,5 +104,36 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.preventDefault();
             }
         });
+    });
+
+    // Theme management (toggle button + settings radios).
+    function applyTheme(val) {
+        var isDark;
+        if (val === 'dark') {
+            isDark = true;
+        } else if (val === 'light') {
+            isDark = false;
+        } else {
+            isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+        }
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('daybreak-theme', val);
+        document.querySelectorAll('input[name="theme"]').forEach(function (r) {
+            r.checked = (r.value === val);
+        });
+    }
+
+    var themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function () {
+            var cur = localStorage.getItem('daybreak-theme') || 'system';
+            applyTheme(cur === 'light' ? 'dark' : cur === 'dark' ? 'system' : 'light');
+        });
+    }
+
+    var storedTheme = localStorage.getItem('daybreak-theme') || 'system';
+    document.querySelectorAll('input[name="theme"]').forEach(function (r) {
+        if (r.value === storedTheme) { r.checked = true; }
+        r.addEventListener('change', function () { applyTheme(r.value); });
     });
 });

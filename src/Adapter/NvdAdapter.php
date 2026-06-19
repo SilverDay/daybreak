@@ -10,12 +10,18 @@ use DateTimeZone;
 
 /**
  * NIST NVD CVE API 2.0 adapter.
- * Fetches recently published CVEs (last 7 days, up to 20) for the CVE widget.
+ * Fetches the 20 most recently published CVEs (last 7 days) for the CVE widget.
  * Items are stored in the articles table but the PublicController surfaces them
  * in the widget rail, not the main feed (adapter_type = 'nvd' is excluded from feed).
+ *
+ * The NVD API always returns results sorted oldest-first with no sort override
+ * supported. To get the newest CVEs we first fetch with resultsPerPage=1 to read
+ * totalResults, then jump to the last page via startIndex.
  */
 final class NvdAdapter implements SourceAdapter
 {
+    private const PAGE_SIZE = 20;
+
     public function supports(string $adapterType): bool
     {
         return $adapterType === 'nvd';
@@ -27,12 +33,34 @@ final class NvdAdapter implements SourceAdapter
         $tz    = new DateTimeZone('UTC');
         $start = (new DateTimeImmutable('-7 days', $tz))->format('Y-m-d\TH:i:s.000');
         $end   = (new DateTimeImmutable('now',     $tz))->format('Y-m-d\TH:i:s.000');
-        $url   = $base
-            . '?pubStartDate=' . urlencode($start)
-            . '&pubEndDate='   . urlencode($end)
-            . '&resultsPerPage=20';
 
-        $res  = $fetcher->get($url);
+        // NVD API key is optional but strongly recommended — without it requests are
+        // aggressively rate-limited and may return 503 under load.
+        // Register free at https://nvd.nist.gov/developers/request-an-api-key
+        $apiKeySuffix = '';
+        $apiKey = \Daybreak\Config::get('NVD_API_KEY');
+        if ($apiKey !== null && $apiKey !== '') {
+            $apiKeySuffix = '&apiKey=' . urlencode($apiKey);
+        }
+
+        $dateParams = '?pubStartDate=' . urlencode($start) . '&pubEndDate=' . urlencode($end);
+        $accept     = ['Accept: application/json'];
+
+        // Step 1: lightweight probe to get totalResults so we can jump to the last page.
+        // NVD/Cloudflare is intermittently slow; retry once on transient failure.
+        $probe = $this->fetchWithRetry($fetcher, $base . $dateParams . '&resultsPerPage=1' . $apiKeySuffix, $accept);
+        if ($probe['status'] >= 400) {
+            $detail = mb_substr(strip_tags((string) $probe['body']), 0, 200);
+            throw new \RuntimeException('NVD probe HTTP ' . $probe['status'] . ($detail !== '' ? ': ' . $detail : ''));
+        }
+        $meta  = json_decode($probe['body'], true);
+        $total = is_array($meta) ? (int) ($meta['totalResults'] ?? 0) : 0;
+
+        // Step 2: fetch the last page (the most recently published CVEs).
+        $startIndex = max(0, $total - self::PAGE_SIZE);
+        $url = $base . $dateParams . '&resultsPerPage=' . self::PAGE_SIZE . '&startIndex=' . $startIndex . $apiKeySuffix;
+
+        $res  = $this->fetchWithRetry($fetcher, $url, $accept);
         $data = json_decode($res['body'], true);
 
         if (!is_array($data) || !isset($data['vulnerabilities']) || !is_array($data['vulnerabilities'])) {
@@ -107,5 +135,21 @@ final class NvdAdapter implements SourceAdapter
         }
 
         return new FetchResult($items, $res['status'], $res['etag'], $res['last_modified']);
+    }
+
+    /**
+     * Fetch with one retry on curl-level failure (errno 28 timeout, connection reset).
+     * NVD/Cloudflare intermittently drops connections; a single retry resolves most cases.
+     *
+     * @param list<string> $headers
+     * @return array{status:int,body:string,etag:?string,last_modified:?string,not_modified:bool}
+     */
+    private function fetchWithRetry(FetchClient $fetcher, string $url, array $headers): array
+    {
+        try {
+            return $fetcher->get($url, null, null, $headers);
+        } catch (\RuntimeException) {
+            return $fetcher->get($url, null, null, $headers);
+        }
     }
 }

@@ -38,7 +38,7 @@ final class AuthService
             if ($uid !== null) {
                 $row = Database::query(
                     'SELECT id, email, display_name, role, status,
-                            default_window_days, last_seen_at
+                            default_window_days, last_seen_at, preferred_languages
                      FROM users WHERE id = ? AND status = ?',
                     [(int) $uid, 'active']
                 )->fetch();
@@ -130,7 +130,7 @@ final class AuthService
      * when the user IS found; throttled path is acceptable because the attacker
      * already knows they're throttled after 5 attempts).
      */
-    public static function login(string $email, string $password): bool
+    public static function login(string $email, string $password, bool $remember = false): bool
     {
         $email = \Daybreak\Service\AuthLogic::normalizeEmail($email);
         $ip    = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -172,11 +172,26 @@ final class AuthService
             [(int) $user['id']]
         );
         self::recordAttempt($email, $ip, true);
+
+        if ($remember) {
+            self::issueRememberToken((int) $user['id']);
+        }
+
         return true;
     }
 
     public static function logout(): void
     {
+        // Revoke the remember-me token that matches the current cookie, if any.
+        $raw = $_COOKIE['daybreak_remember'] ?? null;
+        if (is_string($raw) && $raw !== '') {
+            Database::query(
+                'DELETE FROM remember_tokens WHERE token_hash = ?',
+                [hash('sha256', $raw)]
+            );
+            self::clearRememberCookie();
+        }
+
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $p = session_get_cookie_params();
@@ -193,6 +208,54 @@ final class AuthService
         session_destroy();
         self::$userCache  = null;
         self::$userLoaded = false;
+    }
+
+    /**
+     * Called once per request, after session_start().
+     * If no session exists but a valid remember-me cookie is present, re-establishes
+     * the session and rotates the token (old token deleted, new one issued).
+     */
+    public static function resolveRememberCookie(): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            return;
+        }
+
+        $raw = $_COOKIE['daybreak_remember'] ?? null;
+        if (!is_string($raw) || $raw === '') {
+            return;
+        }
+
+        $row = Database::query(
+            'SELECT id, user_id FROM remember_tokens WHERE token_hash = ? AND expires_at > NOW()',
+            [hash('sha256', $raw)]
+        )->fetch();
+
+        if (!$row) {
+            self::clearRememberCookie();
+            return;
+        }
+
+        $userId = (int) $row['user_id'];
+        $active = Database::query(
+            "SELECT id FROM users WHERE id = ? AND status = 'active'",
+            [$userId]
+        )->fetch();
+
+        if (!$active) {
+            Database::query('DELETE FROM remember_tokens WHERE id = ?', [(int) $row['id']]);
+            self::clearRememberCookie();
+            return;
+        }
+
+        // Rotate: delete the used token and issue a fresh one.
+        Database::query('DELETE FROM remember_tokens WHERE id = ?', [(int) $row['id']]);
+        self::issueRememberToken($userId);
+
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $userId;
+        self::$userLoaded = false;
+        self::$userCache  = null;
     }
 
     // ── Password reset ─────────────────────────────────────────────────────────
@@ -254,8 +317,9 @@ final class AuthService
         );
         self::consumeToken((int) $row['id']);
 
-        // Invalidate all sessions for this user (force re-login everywhere).
+        // Invalidate all sessions and remember tokens for this user.
         Database::query('DELETE FROM sessions WHERE user_id = ?', [(int) $row['user_id']]);
+        Database::query('DELETE FROM remember_tokens WHERE user_id = ?', [(int) $row['user_id']]);
         return true;
     }
 
@@ -413,5 +477,44 @@ final class AuthService
     private static function hashIp(string $ip): string
     {
         return hash('sha256', $ip . Config::get('APP_KEY', 'daybreak'));
+    }
+
+    private static function issueRememberToken(int $userId): void
+    {
+        // Prune any expired tokens for this user to avoid table bloat.
+        Database::query(
+            'DELETE FROM remember_tokens WHERE user_id = ? AND expires_at <= NOW()',
+            [$userId]
+        );
+
+        $raw  = bin2hex(random_bytes(32));
+        $hash = hash('sha256', $raw);
+        Database::query(
+            'INSERT INTO remember_tokens (user_id, token_hash, expires_at)
+             VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 DAY))',
+            [$userId, $hash]
+        );
+
+        $secure = ($_SERVER['HTTPS'] ?? '') === 'on';
+        setcookie('daybreak_remember', $raw, [
+            'expires'  => time() + 10 * 86400,
+            'path'     => '/',
+            'httponly' => true,
+            'secure'   => $secure,
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    private static function clearRememberCookie(): void
+    {
+        $secure = ($_SERVER['HTTPS'] ?? '') === 'on';
+        setcookie('daybreak_remember', '', [
+            'expires'  => time() - 3600,
+            'path'     => '/',
+            'httponly' => true,
+            'secure'   => $secure,
+            'samesite' => 'Lax',
+        ]);
+        unset($_COOKIE['daybreak_remember']);
     }
 }

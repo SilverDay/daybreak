@@ -18,6 +18,11 @@ use Daybreak\Security\Csrf;
            autocomplete="current-password" required>
   </div>
 
+  <label class="remember-me-label">
+    <input type="checkbox" name="remember_me" value="1">
+    Stay logged in for 10 days
+  </label>
+
   <button type="submit" class="btn btn-primary btn-block">Sign in</button>
 </form>
 

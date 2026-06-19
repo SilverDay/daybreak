@@ -29,6 +29,7 @@ session_set_cookie_params([
     'secure'   => ($_SERVER['HTTPS'] ?? '') === 'on',
 ]);
 session_start();
+\Daybreak\Service\AuthService::resolveRememberCookie();
 
 SecurityHeaders::send();
 
@@ -37,6 +38,8 @@ $router = new Router();
 // ── Public feed ────────────────────────────────────────────────────────────────
 $router->get('/',                        [PublicController::class, 'home']);
 $router->get('/category/{slug}',         [PublicController::class, 'home']);
+$router->get('/public',                  [PublicController::class, 'home']);
+$router->get('/public/category/{slug}',  [PublicController::class, 'home']);
 $router->get('/sources',                 [PublicController::class, 'sources']);
 
 // ── Registration ────────────────────────────────────────────────────────────────
@@ -66,6 +69,8 @@ $router->post('/feed/mark-seen',           [FeedController::class,  'markSeen'])
 $router->get('/settings/account',         [UserController::class,  'showAccount']);
 $router->post('/settings/account',         [UserController::class,  'handleAccount']);
 $router->post('/settings/account/delete',  [UserController::class,  'deleteAccount']);
+$router->get('/settings/security',        [UserController::class,  'showSecurity']);
+$router->post('/settings/security',        [UserController::class,  'handleSecurity']);
 $router->get('/settings/export',          [UserController::class,  'export']);
 
 // ── Source preferences (auth required) ────────────────────────────────────────

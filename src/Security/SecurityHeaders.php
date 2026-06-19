@@ -7,12 +7,21 @@ namespace Daybreak\Security;
 /** Send security headers on every web response. Called from the front controller. */
 final class SecurityHeaders
 {
+    private static string $nonce = '';
+
+    /** CSP nonce for the anti-FOUC inline script. Available after send(). */
+    public static function nonce(): string
+    {
+        return self::$nonce;
+    }
+
     public static function send(): void
     {
+        self::$nonce = bin2hex(random_bytes(16));
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
         header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; "
-            . "style-src 'self'; script-src 'self'; object-src 'none'; "
+            . "style-src 'self'; script-src 'self' 'nonce-" . self::$nonce . "'; object-src 'none'; "
             . "base-uri 'self'; frame-ancestors 'none'");
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: strict-origin-when-cross-origin');

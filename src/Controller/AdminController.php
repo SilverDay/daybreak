@@ -20,7 +20,7 @@ use Daybreak\Service\SourcePreviewService;
  */
 final class AdminController
 {
-    private const SUPPORTED_ADAPTERS = ['rss_atom', 'json_api', 'ransomlook', 'nvd'];
+    private const SUPPORTED_ADAPTERS = ['rss_atom', 'json_api', 'ransomlook', 'nvd', 'cisa_kev'];
     private const FAIL_DEGRADE = 3;
     private const FAIL_DISABLE = 8;
 
@@ -517,6 +517,7 @@ final class AdminController
         $catId = $input['category_id'];
         $attrib = (string) $input['attribution_text'];
         $license = (string) $input['license'];
+        $language = $input['language'];
         $interval = (int) $input['fetch_interval_min'];
 
         if ($slug === '') {
@@ -536,8 +537,8 @@ final class AdminController
             Database::query(
                 'INSERT INTO sources
                  (name, slug, homepage_url, feed_url, adapter_type, category_id,
-                  attribution_text, license, fetch_interval_min, field_map, status)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                  attribution_text, license, language, fetch_interval_min, field_map, status)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $name,
                     $slug,
@@ -547,6 +548,7 @@ final class AdminController
                     $catId,
                     $attrib,
                     $license ?: null,
+                    $language,
                     $interval,
                     $fieldMapJson,
                     'pending'
@@ -557,7 +559,7 @@ final class AdminController
 
         Database::query(
             'UPDATE sources SET name=?, slug=?, homepage_url=?, feed_url=?, adapter_type=?,
-             category_id=?, attribution_text=?, license=?, fetch_interval_min=?, field_map=?
+             category_id=?, attribution_text=?, license=?, language=?, fetch_interval_min=?, field_map=?
              WHERE id=?',
             [
                 $name,
@@ -568,6 +570,7 @@ final class AdminController
                 $catId,
                 $attrib,
                 $license ?: null,
+                $language,
                 $interval,
                 $fieldMapJson,
                 $id
@@ -584,10 +587,12 @@ final class AdminController
     }
 
     /**
-     * @return array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,fetch_interval_min:int,field_map:string}
+     * @return array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,language:?string,fetch_interval_min:int,field_map:string}
      */
     private function normalizeSourceInput(array $post): array
     {
+        $allowedLanguages = ['en','de','fr','es','pt','nl','it','ja','zh','ko','ru','ar','pl','sv','fi','da','no'];
+        $rawLang = mb_substr(trim((string) ($post['language'] ?? '')), 0, 10);
         return [
             'name' => mb_substr(trim((string) ($post['name'] ?? '')), 0, 120),
             'slug' => mb_substr(trim((string) ($post['slug'] ?? '')), 0, 120),
@@ -597,6 +602,7 @@ final class AdminController
             'category_id' => (($post['category_id'] ?? '') !== '' ? (int) $post['category_id'] : null),
             'attribution_text' => mb_substr(trim((string) ($post['attribution_text'] ?? '')), 0, 255),
             'license' => mb_substr(trim((string) ($post['license'] ?? '')), 0, 120),
+            'language' => in_array($rawLang, $allowedLanguages, true) ? $rawLang : null,
             'fetch_interval_min' => max(1, min(1440, (int) ($post['fetch_interval_min'] ?? 15))),
             'field_map' => trim((string) ($post['field_map'] ?? '')),
         ];
@@ -693,6 +699,7 @@ final class AdminController
         $source['category_id'] = $input['category_id'];
         $source['attribution_text'] = $input['attribution_text'];
         $source['license'] = $input['license'];
+        $source['language'] = $input['language'];
         $source['fetch_interval_min'] = $input['fetch_interval_min'];
         $source['field_map'] = $input['field_map'];
 

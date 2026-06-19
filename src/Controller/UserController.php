@@ -16,23 +16,54 @@ final class UserController
     public function showAccount(array $args = []): void
     {
         AuthService::requireAuth();
-        $user      = AuthService::currentUser();
-        $userId    = (int) ($user['id'] ?? 0);
+        $user        = AuthService::currentUser();
+        $userId      = (int) ($user['id'] ?? 0);
         $hasKiojuKey = KiojuService::hasApiKey($userId);
-        $title     = 'Account settings';
-        $activeNav = 'settings';
-
-        $categories      = [];
-        $ransomlookItems = [];
-        $cveItems        = [];
-        $windowDays      = 1;
-        $activeCategory  = null;
-        $showWidgets     = false;
+        $title       = 'General';
+        $settingsNav = 'general';
 
         header('Content-Type: text/html; charset=utf-8');
-        include DB_ROOT . '/src/View/layout.php';
-        include DB_ROOT . '/src/View/user/account.php';
-        include DB_ROOT . '/src/View/layout_end.php';
+        include DB_ROOT . '/src/View/settings_layout.php';
+        include DB_ROOT . '/src/View/user/general.php';
+        include DB_ROOT . '/src/View/settings_layout_end.php';
+    }
+
+    public function showSecurity(array $args = []): void
+    {
+        AuthService::requireAuth();
+        $title       = 'Security';
+        $settingsNav = 'security';
+
+        header('Content-Type: text/html; charset=utf-8');
+        include DB_ROOT . '/src/View/settings_layout.php';
+        include DB_ROOT . '/src/View/user/security.php';
+        include DB_ROOT . '/src/View/settings_layout_end.php';
+    }
+
+    public function handleSecurity(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+
+        $user   = AuthService::currentUser();
+        $userId = (int) $user['id'];
+
+        $current = $_POST['current_password'] ?? '';
+        $new     = $_POST['new_password']     ?? '';
+        $confirm = $_POST['confirm_password'] ?? '';
+
+        if ($new !== $confirm) {
+            $_SESSION['flash_error'] = 'New passwords do not match.';
+        } elseif (mb_strlen($new) < 12) {
+            $_SESSION['flash_error'] = 'Password must be at least 12 characters.';
+        } elseif (!AuthService::changePassword($userId, $current, $new)) {
+            $_SESSION['flash_error'] = 'Current password is incorrect.';
+        } else {
+            $_SESSION['flash'] = 'Password updated.';
+        }
+
+        header('Location: /settings/security');
+        exit;
     }
 
     public function handleAccount(array $args = []): void
@@ -54,20 +85,6 @@ final class UserController
                 $_SESSION['flash_error'] = 'Display name cannot be empty.';
             } else {
                 $_SESSION['flash'] = 'Display name updated.';
-            }
-        } elseif ($action === 'password') {
-            $current = $_POST['current_password'] ?? '';
-            $new     = $_POST['new_password']     ?? '';
-            $confirm = $_POST['confirm_password'] ?? '';
-
-            if ($new !== $confirm) {
-                $_SESSION['flash_error'] = 'New passwords do not match.';
-            } elseif (mb_strlen($new) < 12) {
-                $_SESSION['flash_error'] = 'Password must be at least 12 characters.';
-            } elseif (!AuthService::changePassword($userId, $current, $new)) {
-                $_SESSION['flash_error'] = 'Current password is incorrect.';
-            } else {
-                $_SESSION['flash'] = 'Password updated.';
             }
         } elseif ($action === 'kioju_save') {
             $apiKey = trim((string) ($_POST['kioju_api_key'] ?? ''));
@@ -118,7 +135,7 @@ final class UserController
 
         // All active feed sources (widgets excluded — they're not user-selectable).
         $sources = Database::query(
-            "SELECT s.id, s.name, s.attribution_text,
+            "SELECT s.id, s.name, s.attribution_text, s.language,
                     c.name AS category_name, c.slug AS category_slug, c.sort_order
              FROM sources s
              LEFT JOIN source_categories c ON c.id = s.category_id
@@ -134,26 +151,44 @@ final class UserController
         )->fetchAll(\PDO::FETCH_COLUMN);
         $disabledIds = array_flip(array_map('intval', $disabledRaw));
 
+        // Available languages from active sources that have one set.
+        $availableLanguages = Database::query(
+            "SELECT DISTINCT language FROM sources
+             WHERE language IS NOT NULL
+               AND status IN ('active', 'degraded')
+               AND adapter_type IN ('rss_atom', 'json_api')
+             ORDER BY language"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+
+        // User's current language preference.
+        $rawLangPref = $user['preferred_languages'] ?? null;
+        $preferredLanguages = (is_string($rawLangPref) && $rawLangPref !== '')
+            ? (json_decode($rawLangPref, true) ?? [])
+            : [];
+
+        // Filter sources by language when a preference is set.
+        // Sources without a language tag are always included.
+        if ($preferredLanguages !== []) {
+            $prefSet = array_flip($preferredLanguages);
+            $sources = array_values(array_filter(
+                $sources,
+                static fn($s) => $s['language'] === null || isset($prefSet[$s['language']])
+            ));
+        }
+
         // Group sources by category name.
         $grouped = [];
         foreach ($sources as $s) {
             $grouped[$s['category_name'] ?? 'Uncategorized'][] = $s;
         }
 
-        $title     = 'Source preferences';
-        $activeNav = 'settings';
-
-        $categories      = Database::query('SELECT id, name, slug, color FROM source_categories ORDER BY sort_order')->fetchAll();
-        $windowDays      = 1;
-        $activeCategory  = null;
-        $ransomlookItems = [];
-        $cveItems        = [];
-        $showWidgets     = false;
+        $title       = 'Edit feed';
+        $settingsNav = 'feed';
 
         header('Content-Type: text/html; charset=utf-8');
-        include DB_ROOT . '/src/View/layout.php';
+        include DB_ROOT . '/src/View/settings_layout.php';
         include DB_ROOT . '/src/View/user/sources.php';
-        include DB_ROOT . '/src/View/layout_end.php';
+        include DB_ROOT . '/src/View/settings_layout_end.php';
     }
 
     public function handleSources(array $args = []): void
@@ -164,29 +199,45 @@ final class UserController
         $user   = AuthService::currentUser();
         $userId = (int) $user['id'];
 
-        // Authoritative list of selectable source IDs from the DB.
-        $allIds = array_map('intval', Database::query(
-            "SELECT id FROM sources
-             WHERE status IN ('active', 'degraded') AND adapter_type IN ('rss_atom', 'json_api')"
-        )->fetchAll(\PDO::FETCH_COLUMN));
+        $action = $_POST['action'] ?? 'sources';
 
-        // IDs the user checked (submitted via checkboxes).
-        $checkedIds = array_flip(array_map('intval', (array) ($_POST['sources'] ?? [])));
+        if ($action === 'languages') {
+            $allowedLanguages = ['en','de','fr','es','pt','nl','it','ja','zh','ko','ru','ar','pl','sv','fi','da','no'];
+            $submittedLangs = array_values(array_filter(
+                array_unique((array) ($_POST['preferred_languages'] ?? [])),
+                static fn($c) => in_array($c, $allowedLanguages, true)
+            ));
+            $langJson = $submittedLangs !== [] ? json_encode($submittedLangs, JSON_THROW_ON_ERROR) : null;
+            Database::query(
+                'UPDATE users SET preferred_languages = ? WHERE id = ?',
+                [$langJson, $userId]
+            );
+            $_SESSION['flash'] = 'Language filter saved.';
+        } else {
+            // Authoritative list of selectable source IDs from the DB.
+            $allIds = array_map('intval', Database::query(
+                "SELECT id FROM sources
+                 WHERE status IN ('active', 'degraded') AND adapter_type IN ('rss_atom', 'json_api')"
+            )->fetchAll(\PDO::FETCH_COLUMN));
 
-        // Clear existing preferences and insert disabled rows only.
-        // Absent row = opted-in, so we only need to record opt-outs.
-        Database::query('DELETE FROM user_sources WHERE user_id = ?', [$userId]);
+            // IDs the user checked (submitted via checkboxes).
+            $checkedIds = array_flip(array_map('intval', (array) ($_POST['sources'] ?? [])));
 
-        foreach ($allIds as $sid) {
-            if (!isset($checkedIds[$sid])) {
-                Database::query(
-                    'INSERT INTO user_sources (user_id, source_id, enabled) VALUES (?, ?, 0)',
-                    [$userId, $sid]
-                );
+            // Clear existing preferences and insert disabled rows only.
+            // Absent row = opted-in, so we only need to record opt-outs.
+            Database::query('DELETE FROM user_sources WHERE user_id = ?', [$userId]);
+
+            foreach ($allIds as $sid) {
+                if (!isset($checkedIds[$sid])) {
+                    Database::query(
+                        'INSERT INTO user_sources (user_id, source_id, enabled) VALUES (?, ?, 0)',
+                        [$userId, $sid]
+                    );
+                }
             }
+            $_SESSION['flash'] = 'Source preferences saved.';
         }
 
-        $_SESSION['flash'] = 'Source preferences saved.';
         header('Location: /settings/sources');
         exit;
     }

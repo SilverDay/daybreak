@@ -68,20 +68,9 @@ $burstySources = is_array($derivedMetrics['bursty_sources'] ?? null) ? $derivedM
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="filter-item">
-                    <label for="sources-sort" class="filter-label">Sort by</label>
-                    <select id="sources-sort" name="sort" class="filter-select">
-                        <option value="total" <?= $sortKey === 'total' ? ' selected' : '' ?>>Most articles overall</option>
-                        <option value="recent_24h" <?= $sortKey === 'recent_24h' ? ' selected' : '' ?>>Most active in last 24h</option>
-                        <option value="recent_7d" <?= $sortKey === 'recent_7d' ? ' selected' : '' ?>>Most active in last 7 days</option>
-                        <option value="recent_30d" <?= $sortKey === 'recent_30d' ? ' selected' : '' ?>>Most active in last 30 days</option>
-                        <option value="latest" <?= $sortKey === 'latest' ? ' selected' : '' ?>>Recently updated</option>
-                        <option value="name" <?= $sortKey === 'name' ? ' selected' : '' ?>>Alphabetical</option>
-                    </select>
-                </div>
             </div>
             <div class="form-actions">
-                <?php if ($activeCategory !== null || $searchQuery !== '' || $sortKey !== 'total'): ?>
+                <?php if ($activeCategory !== null || $searchQuery !== ''): ?>
                     <a href="/sources" class="btn btn-secondary">Reset</a>
                 <?php endif; ?>
             </div>
@@ -92,28 +81,46 @@ $burstySources = is_array($derivedMetrics['bursty_sources'] ?? null) ? $derivedM
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>Source</th>
-                    <th>Category</th>
-                    <th class="num">24h</th>
-                    <th class="num">7d</th>
-                    <th class="num">30d</th>
-                    <th class="num">Articles</th>
-                    <th>Latest article</th>
+                    <th data-sort="text" data-sort-dir="asc">Source</th>
+                    <th data-sort="text">Category</th>
+                    <th data-sort="text">Health</th>
+                    <th class="num" data-sort="num">24h</th>
+                    <th class="num" data-sort="num">7d</th>
+                    <th class="num" data-sort="num">30d</th>
+                    <th class="num" data-sort="num">Articles</th>
+                    <th data-sort="date">Latest article</th>
                     <th>Homepage</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($sources as $source): ?>
-                    <tr>
+                    <?php
+                        $freshness = sourceFreshness(
+                            (string) ($source['status'] ?? 'active'),
+                            isset($source['latest_article_at']) ? (string) $source['latest_article_at'] : null,
+                            isset($source['last_recovered_at']) ? (string) $source['last_recovered_at'] : null
+                        );
+                        $rowClass = match($freshness) {
+                            'degraded'  => 'health-risk--warn',
+                            'down'      => 'health-risk--critical',
+                            default     => '',
+                        };
+                    ?>
+                    <tr<?= $rowClass !== '' ? ' class="' . Html::e($rowClass) . '"' : '' ?>>
                         <td>
                             <strong><?= Html::e((string) $source['name']) ?></strong>
                         </td>
                         <td><?= Html::e((string) ($source['category_name'] ?? '—')) ?></td>
+                        <td>
+                            <span class="freshness-badge freshness-badge--<?= Html::e($freshness) ?>">
+                                <?= Html::e($freshness) ?>
+                            </span>
+                        </td>
                         <td class="num"><?= (int) ($source['articles_24h'] ?? 0) ?></td>
                         <td class="num"><?= (int) ($source['articles_7d'] ?? 0) ?></td>
                         <td class="num"><?= (int) ($source['articles_30d'] ?? 0) ?></td>
                         <td class="num"><?= (int) ($source['total_articles'] ?? 0) ?></td>
-                        <td>
+                        <td data-sort-value="<?= Html::e((string) ($source['latest_article_at'] ?? '')) ?>">
                             <?php if (!empty($source['latest_article_at'])): ?>
                                 <strong><?= Html::e(relativeTime((string) $source['latest_article_at'])) ?></strong>
                                 <div class="text-secondary text-sm"><?= Html::e((new DateTimeImmutable((string) $source['latest_article_at']))->format('M j, Y H:i')) ?></div>
@@ -130,7 +137,7 @@ $burstySources = is_array($derivedMetrics['bursty_sources'] ?? null) ? $derivedM
                 <?php endforeach; ?>
                 <?php if (empty($sources)): ?>
                     <tr>
-                        <td colspan="8" class="text-secondary text-center">No public sources matched this filter.</td>
+                        <td colspan="9" class="text-secondary text-center">No public sources matched this filter.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
