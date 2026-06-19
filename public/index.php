@@ -17,6 +17,7 @@ use Daybreak\Controller\PageController;
 use Daybreak\Controller\PublicController;
 use Daybreak\Controller\SearchController;
 use Daybreak\Controller\SuggestController;
+use Daybreak\Controller\StarController;
 use Daybreak\Controller\UserController;
 
 // DB-backed session handler must be registered before session_start().
@@ -59,6 +60,10 @@ $router->get('/password/forgot',        [AuthController::class,  'showForgot']);
 $router->post('/password/forgot',        [AuthController::class,  'handleForgot']);
 $router->get('/password/reset/{token}', [AuthController::class,  'showReset']);
 $router->post('/password/reset/{token}', [AuthController::class,  'handleReset']);
+
+// ── Starred articles (auth required) ──────────────────────────────────────────
+$router->get('/starred',                   [StarController::class,  'list']);
+$router->post('/star',                     [StarController::class,  'toggle']);
 
 // ── Personal RSS (token auth, no session required) ────────────────────────────
 $router->get('/feed/rss',                  [FeedController::class,  'rss']);

@@ -136,4 +136,25 @@ document.addEventListener('DOMContentLoaded', function () {
         if (r.value === storedTheme) { r.checked = true; }
         r.addEventListener('change', function () { applyTheme(r.value); });
     });
+
+    // Star toggle — event delegation handles all .star-btn clicks.
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.star-btn');
+        if (!btn) return;
+        e.preventDefault();
+        var articleId = btn.dataset.articleId;
+        var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        fetch('/star', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: '_csrf=' + encodeURIComponent(csrf) + '&article_id=' + encodeURIComponent(articleId)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (typeof data.starred !== 'undefined') {
+                btn.classList.toggle('star-btn--active', data.starred);
+                btn.setAttribute('aria-label', data.starred ? 'Unstar article' : 'Star article');
+            }
+        });
+    });
 });

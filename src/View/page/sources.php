@@ -109,6 +109,9 @@ $burstySources = is_array($derivedMetrics['bursty_sources'] ?? null) ? $derivedM
                     <tr<?= $rowClass !== '' ? ' class="' . Html::e($rowClass) . '"' : '' ?>>
                         <td>
                             <strong><?= Html::e((string) $source['name']) ?></strong>
+                            <?php if (!empty($source['last_success_at'])): ?>
+                                <div class="text-secondary text-sm">Fetched <?= Html::e(relativeTime((string) $source['last_success_at'])) ?></div>
+                            <?php endif; ?>
                         </td>
                         <td><?= Html::e((string) ($source['category_name'] ?? '—')) ?></td>
                         <td>

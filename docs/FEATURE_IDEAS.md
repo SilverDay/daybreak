@@ -230,11 +230,11 @@ source by hand. OPML import turns a 30-minute task into 30 seconds.
 
 | # | Feature | Effort | Value |
 |---|---------|--------|-------|
-| 7 | Dark mode | Low | High |
-| 9 | Feed pagination | Low | Medium |
-| 2 | Keyword watch terms | Medium | High |
-| 3 | Personal RSS output | Medium | High |
-| 4 | Native starring | Medium | High |
+| 7 | Dark mode | Low | High | Done
+| 9 | Feed pagination | Low | Medium | Done
+| 2 | Keyword watch terms | Medium | High | Done 
+| 3 | Personal RSS output | Medium | High | Done 
+| 4 | Native starring | Medium | High | Done 
 | 6 | GitHub Advisory adapter | Medium | High |
 | 5 | Webhooks | Medium–High | High |
 | 1 | EPSS scores | Medium | Medium |

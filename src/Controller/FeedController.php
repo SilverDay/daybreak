@@ -104,7 +104,7 @@ final class FeedController
         }
 
         $articles = DedupService::group(Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
+            "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
@@ -122,17 +122,21 @@ final class FeedController
             $params
         )->fetchAll());
 
-        // Load user's watch terms and flag matching articles.
-        // Done before slicing so $alertArticles covers the full 24h window, not just
-        // the current page.
+        // Load watch terms and starred IDs before slicing (both need the full result set).
         $rawTerms   = Database::query(
             'SELECT id, term FROM user_watch_terms WHERE user_id = ? ORDER BY created_at ASC',
             [$userId]
         )->fetchAll();
-        $lowerTerms  = array_map(fn($t) => mb_strtolower($t['term']), $rawTerms);
-        $watchTerms  = array_column($rawTerms, 'term');
+        $lowerTerms = array_map(fn($t) => mb_strtolower($t['term']), $rawTerms);
+        $watchTerms = array_column($rawTerms, 'term');
+
+        $starredIds = array_flip(array_map('intval', Database::query(
+            'SELECT article_id FROM user_starred_articles WHERE user_id = ?', [$userId]
+        )->fetchAll(\PDO::FETCH_COLUMN)));
+
         $alertArticles = [];
         foreach ($articles as &$a) {
+            $a['starred'] = isset($starredIds[(int) ($a['id'] ?? 0)]);
             if ($lowerTerms === []) {
                 $a['watch_match'] = false;
                 continue;
