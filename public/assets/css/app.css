@@ -1421,6 +1421,26 @@ main {
   margin-bottom: 0;
 }
 
+/* ── Reading stats grid ───────────────────────────────────────────────────────── */
+.admin-read-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .admin-read-stats-grid { grid-template-columns: 1fr; }
+}
+.read-stats-article-col { max-width: 260px; }
+.admin-subsection-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.625rem;
+}
+
 /* ── Tables ───────────────────────────────────────────────────────────────────── */
 .table-wrap {
   overflow-x: auto;
@@ -2033,6 +2053,7 @@ code.audit-action {
   font-size: 0.72rem;
   font-weight: 600;
   color: #fff;
+  background-color: var(--badge-color, #ccc);
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius-sm);
   text-transform: uppercase;
@@ -2340,6 +2361,10 @@ textarea:focus-visible {
   border-color: #1d4ed8;
 }
 
+[data-theme="dark"] .article-card--read {
+  opacity: 0.45;
+}
+
 [data-theme="dark"] .article-summary {
   color: #94a3b8;
 }
@@ -2570,6 +2595,10 @@ textarea:focus-visible {
 /* ── Article card highlight (watch term match) ────────────────────────────────── */
 .article-card--highlight { border-left: 3px solid var(--color-accent-light); }
 
+/* ── Article card read state ─────────────────────────────────────────────────── */
+.article-card--read { opacity: 0.5; }
+.article-card--read .article-title a { color: var(--color-text-muted); }
+
 /* ── Watch term list (settings page) ─────────────────────────────────────────── */
 .watch-term-list { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .watch-term-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9375rem; }
@@ -2603,6 +2632,39 @@ textarea:focus-visible {
 .star-btn--active { color: var(--color-accent-light); }
 .star-btn--active .star-icon { fill: currentColor; stroke: none; }
 .star-btn:not(.star-btn--active) .star-icon { fill: none; stroke: currentColor; stroke-width: 1.5; }
+
+/* ── CSP-safe layout utilities ────────────────────────────────────────────────── */
+.u-mb-05  { margin-bottom: 0.5rem; }
+.u-mb-075 { margin-bottom: 0.75rem; }
+.u-mb-1   { margin-bottom: 1rem; }
+.u-mb-15  { margin-bottom: 1.5rem; }
+.flex-row    { display: flex; gap: 0.5rem; }
+.flex-row-mt { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+/* ── Admin / form helpers ──────────────────────────────────────────────────────── */
+.flash-wrap--form   { margin: 0 0 1rem; padding: 0; }
+.form-group--narrow { max-width: 240px; }
+.preview-msg     { margin: 0 0 0.75rem; }
+.preview-warning { margin: 0 0 0.5rem; }
+.label-normal    { font-weight: 400; }
+
+/* ── Webhook list items ────────────────────────────────────────────────────────── */
+.webhook-item { flex-direction: column; align-items: flex-start; gap: 0.35rem; padding: 0.75rem 0; border-bottom: 1px solid var(--color-border); }
+.webhook-item-header { display: flex; align-items: center; gap: 0.6rem; width: 100%; }
+.webhook-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.webhook-item-detail { font-size: 0.78rem; word-break: break-all; }
+.cat-filter-grid  { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.3rem; }
+.cat-filter-label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.875rem; cursor: pointer; }
+
+/* ── Webhook delivery log table ────────────────────────────────────────────────── */
+.settings-section--mt { margin-top: 2rem; }
+.wh-log-table { width: 100%; font-size: 0.8125rem; border-collapse: collapse; }
+.wh-log-table th,
+.wh-log-table td { padding: 0.35rem 0.5rem; }
+.wh-log-table thead tr { text-align: left; border-bottom: 1px solid var(--color-border); }
+.wh-log-table tbody tr { border-bottom: 1px solid var(--color-border); }
+.wh-log-article { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wh-log-time    { white-space: nowrap; color: var(--color-text-muted); }
 
 /* ── Detached starred article badge ───────────────────────────────────────────── */
 .detached-badge {

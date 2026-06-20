@@ -36,7 +36,7 @@ if ($alertArticles !== []): ?>
           <a href="<?= Html::e($wa['url']) ?>" target="_blank" rel="noopener noreferrer nofollow">
             <?= Html::e($wa['title']) ?>
           </a>
-          <span class="source-badge" style="--badge-color:<?= Html::e($wa['color'] ?? '#909090') ?>">
+          <span class="source-badge" data-badge-color="<?= Html::e($wa['color'] ?? '#909090') ?>">
             <?= Html::e($wa['source_name']) ?>
           </span>
         </li>
@@ -68,9 +68,10 @@ if ($alertArticles !== []): ?>
   </div>
 <?php else: ?>
   <?php foreach ($articles as $a): ?>
-    <article class="article-card<?= ($a['watch_match'] ?? false) ? ' article-card--highlight' : '' ?>">
+    <article class="article-card<?= ($a['watch_match'] ?? false) ? ' article-card--highlight' : '' ?><?= ($a['read'] ?? false) ? ' article-card--read' : '' ?>"
+             data-article-id="<?= (int) ($a['id'] ?? 0) ?>">
       <div class="article-meta">
-        <span class="source-badge" style="--badge-color:<?= Html::e($a['color'] ?? '#909090') ?>">
+        <span class="source-badge" data-badge-color="<?= Html::e($a['color'] ?? '#909090') ?>">
           <?= Html::e($a['source_name']) ?>
         </span>
         <?php if (!empty($a['category'])): ?>

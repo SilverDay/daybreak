@@ -238,7 +238,7 @@ source by hand. OPML import turns a 30-minute task into 30 seconds.
 | 6 | GitHub Advisory adapter | Medium | High | Done
 | 5 | Webhooks | Medium–High | High | Done
 | 1 | EPSS scores | Medium | Medium | Done
-| 8 | Per-article read tracking | Medium | Medium |
+| 8 | Per-article read tracking | Medium | Medium | Done
 | 10 | OPML import | Low | Medium |
 
 **Suggested starting order:** Dark mode → GitHub Advisory adapter → Keyword watch terms → Personal RSS output.

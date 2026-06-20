@@ -17,7 +17,7 @@ $totalPages = $totalPages ?? 1;
   <?php foreach ($starred as $a): ?>
     <article class="article-card">
       <div class="article-meta">
-        <span class="source-badge" style="--badge-color:#909090">
+        <span class="source-badge" data-badge-color="#909090">
           <?= Html::e($a['source_name']) ?>
         </span>
         <?php if ($a['detached']): ?>

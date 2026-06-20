@@ -15,7 +15,7 @@ use Daybreak\Security\Csrf;
   <?php foreach ($articles as $a): ?>
     <article class="article-card">
       <div class="article-meta">
-        <span class="source-badge" style="--badge-color:<?= Html::e($a['color'] ?? '#909090') ?>">
+        <span class="source-badge" data-badge-color="<?= Html::e($a['color'] ?? '#909090') ?>">
           <?= Html::e($a['source_name']) ?>
         </span>
         <?php if (in_array($a['source_status'] ?? 'active', ['degraded', 'auto_disabled'], true)): ?>

@@ -134,9 +134,14 @@ final class FeedController
             'SELECT article_id FROM user_starred_articles WHERE user_id = ?', [$userId]
         )->fetchAll(\PDO::FETCH_COLUMN)));
 
+        $readIds = array_flip(array_map('intval', Database::query(
+            'SELECT article_id FROM user_article_reads WHERE user_id = ?', [$userId]
+        )->fetchAll(\PDO::FETCH_COLUMN)));
+
         $alertArticles = [];
         foreach ($articles as &$a) {
             $a['starred'] = isset($starredIds[(int) ($a['id'] ?? 0)]);
+            $a['read']    = isset($readIds[(int) ($a['id'] ?? 0)]);
             if ($lowerTerms === []) {
                 $a['watch_match'] = false;
                 continue;
@@ -331,6 +336,26 @@ final class FeedController
         $returnTo = $this->safeReturnPath((string) ($_POST['return_to'] ?? '/feed?days=since'));
         header('Location: ' . $returnTo);
         exit;
+    }
+
+    public function markRead(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+        $articleId = (int) ($_POST['article_id'] ?? 0);
+        if ($articleId <= 0) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'invalid']);
+            return;
+        }
+        $user = AuthService::currentUser();
+        Database::query(
+            'INSERT IGNORE INTO user_article_reads (user_id, article_id) VALUES (?, ?)',
+            [(int) $user['id'], $articleId]
+        );
+        header('Content-Type: application/json');
+        echo json_encode(['read' => true]);
     }
 
     private function safeReturnPath(string $candidate): string

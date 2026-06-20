@@ -63,7 +63,7 @@ $languageOptions = [
 <?php endif; ?>
 
 <?php if (!empty($formErrors)): ?>
-  <div class="flash-wrap" style="margin:0 0 1rem 0;">
+  <div class="flash-wrap flash-wrap--form">
     <?php foreach ($formErrors as $error): ?>
       <div class="flash flash-error"><?= Html::e((string) $error) ?></div>
     <?php endforeach; ?>
@@ -150,7 +150,7 @@ $languageOptions = [
           </select>
         </div>
       </div>
-      <div class="form-group" style="max-width:240px">
+      <div class="form-group form-group--narrow">
         <label class="form-label" for="src-interval">Fetch interval (minutes)</label>
         <input id="src-interval" class="form-input" type="number" name="fetch_interval_min"
           value="<?= (int) ($s['fetch_interval_min'] ?? 15) ?>" min="1" max="1440">
@@ -184,16 +184,16 @@ $languageOptions = [
 
       <?php if (!empty($previewResult['errors'])): ?>
         <?php foreach ($previewResult['errors'] as $error): ?>
-          <div class="flash flash-error" style="margin:0 0 .75rem 0;"><?= Html::e((string) $error) ?></div>
+          <div class="flash flash-error preview-msg"><?= Html::e((string) $error) ?></div>
         <?php endforeach; ?>
       <?php elseif (!empty($previewResult['not_modified'])): ?>
-        <div class="text-secondary text-sm" style="margin:0 0 .75rem 0;">Preview completed: source responded with not modified.</div>
+        <div class="text-secondary text-sm preview-msg">Preview completed: source responded with not modified.</div>
       <?php else: ?>
-        <div class="text-secondary text-sm" style="margin:0 0 .75rem 0;">Preview completed successfully.</div>
+        <div class="text-secondary text-sm preview-msg">Preview completed successfully.</div>
       <?php endif; ?>
 
       <?php foreach (($previewResult['warnings'] ?? []) as $warning): ?>
-        <div class="text-secondary text-sm" style="margin:0 0 .5rem 0;">Warning: <?= Html::e((string) $warning) ?></div>
+        <div class="text-secondary text-sm preview-warning">Warning: <?= Html::e((string) $warning) ?></div>
       <?php endforeach; ?>
 
       <?php if (!empty($previewResult['sample_items'])): ?>

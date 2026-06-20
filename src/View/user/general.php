@@ -53,16 +53,16 @@ use Daybreak\Security\Csrf;
 
   <section class="settings-section">
     <h2 class="settings-section-title">Kioju bookmarks</h2>
-    <p class="form-hint" style="margin-bottom:1rem">
+    <p class="form-hint u-mb-1">
       Connect your Kioju API key to save article links directly from Daybreak.
     </p>
     <?php if ($hasKiojuKey): ?>
-      <p class="form-hint" style="margin-bottom:1rem">Status: <strong>Connected</strong></p>
+      <p class="form-hint u-mb-1">Status: <strong>Connected</strong></p>
     <?php else: ?>
-      <p class="form-hint" style="margin-bottom:1rem">Status: Not connected</p>
+      <p class="form-hint u-mb-1">Status: Not connected</p>
     <?php endif; ?>
 
-    <form method="post" action="/settings/account" style="margin-bottom:0.75rem">
+    <form method="post" action="/settings/account" class="u-mb-075">
       <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
       <input type="hidden" name="action" value="kioju_save">
       <div class="form-group">
@@ -85,17 +85,17 @@ use Daybreak\Security\Csrf;
 
   <section class="settings-section">
     <h2 class="settings-section-title">Personal RSS feed</h2>
-    <p class="form-hint" style="margin-bottom:1rem">
+    <p class="form-hint u-mb-1">
       Subscribe to your personalised feed in any RSS reader.
       The URL contains a secret token &mdash; treat it like a password.
     </p>
 
     <?php if (($rssTokenRaw ?? null) !== null): ?>
-      <p class="form-hint" style="margin-bottom:0.5rem">
+      <p class="form-hint u-mb-05">
         <strong>Copy this URL now &mdash; it will not be shown again.</strong>
       </p>
       <code class="rss-url-box"><?= Html::e(($rssBaseUrl ?? '') . '?token=' . $rssTokenRaw) ?></code>
-      <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+      <div class="flex-row-mt">
         <form method="post" action="/settings/account">
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
           <input type="hidden" name="action" value="rss_generate">
@@ -108,8 +108,8 @@ use Daybreak\Security\Csrf;
         </form>
       </div>
     <?php elseif ($hasRssToken ?? false): ?>
-      <p class="form-hint" style="margin-bottom:0.75rem">Token active. URL was shown on generation.</p>
-      <div style="display:flex;gap:0.5rem">
+      <p class="form-hint u-mb-075">Token active. URL was shown on generation.</p>
+      <div class="flex-row">
         <form method="post" action="/settings/account">
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
           <input type="hidden" name="action" value="rss_generate">

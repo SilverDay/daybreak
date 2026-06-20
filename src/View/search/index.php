@@ -77,7 +77,7 @@ use Daybreak\Security\Csrf;
                             </h3>
                             <span class="article-source"><?= Html::e($article['source_name']) ?></span>
                             <?php if ($article['category']): ?>
-                                <span class="article-category" style="background-color: <?= Html::e($article['color'] ?? '#ccc') ?>">
+                                <span class="article-category" data-badge-color="<?= Html::e($article['color'] ?? '#ccc') ?>">
                                     <?= Html::e($article['category']) ?>
                                 </span>
                             <?php endif; ?>

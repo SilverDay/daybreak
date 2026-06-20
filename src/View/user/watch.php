@@ -12,7 +12,7 @@ $watchTerms = $watchTerms ?? [];
 
   <section class="settings-section">
     <h2 class="settings-section-title">Watch terms</h2>
-    <p class="form-hint" style="margin-bottom:1rem">
+    <p class="form-hint u-mb-1">
       Articles containing these keywords (case-insensitive) are highlighted in My Feed.
       Matches from the last 24&nbsp;hours also appear in an Alerts block at the top of your feed.
     </p>
@@ -32,7 +32,7 @@ $watchTerms = $watchTerms ?? [];
         <?php endforeach; ?>
       </ul>
     <?php else: ?>
-      <p class="form-hint" style="margin-bottom:1rem">No watch terms set.</p>
+      <p class="form-hint u-mb-1">No watch terms set.</p>
     <?php endif; ?>
 
     <form method="post" action="/settings/watch">

@@ -45,6 +45,7 @@ if ($slug !== null) {
 } else {
     $r = $svc->runDue($force);
     $epss->refreshDue();
+    Database::query('DELETE FROM user_article_reads WHERE read_at < DATE_SUB(NOW(), INTERVAL 90 DAY)');
     echo "done: {$r['ok']} ok, {$r['errors']} errors\n";
 }
 

@@ -26,7 +26,7 @@ $languageLabels = [
   <?php if (!empty($availableLanguages)): ?>
   <section class="settings-section">
     <h2 class="settings-section-title">Language filter</h2>
-    <p class="form-hint" style="margin-bottom:1.25rem">
+    <p class="form-hint u-mb-1">
       Restrict <a href="/feed" class="form-link">My Feed</a> to specific languages.
       Sources without a language tag are always shown. Leave everything unchecked to see all languages.
     </p>
@@ -54,7 +54,7 @@ $languageLabels = [
 
   <section class="settings-section">
     <h2 class="settings-section-title">Source preferences</h2>
-    <p class="form-hint" style="margin-bottom:1.25rem">
+    <p class="form-hint u-mb-1">
       Choose which sources appear in <a href="/feed" class="form-link">My Feed</a>.
       Deselected sources still appear on the public page. All sources are included by default.
     </p>

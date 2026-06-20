@@ -2,7 +2,7 @@
 use Daybreak\Security\Html;
 use Daybreak\Security\Csrf;
 ?>
-<p class="form-hint" style="margin-bottom:1rem">
+<p class="form-hint u-mb-1">
   Enter your email address and we'll send you a link to reset your password.
 </p>
 

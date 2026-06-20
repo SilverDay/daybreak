@@ -2,6 +2,11 @@
 // Any <th data-sort="text|num|date"> becomes a clickable sort header.
 // <td data-sort-value="..."> overrides cell text for sorting (used for date columns).
 (function () {
+    // Apply dynamic badge colors via JS (CSP-safe: el.style.setProperty is not
+    // blocked by style-src 'self', unlike inline style="" attributes).
+    document.querySelectorAll('[data-badge-color]').forEach(function(el) {
+        el.style.setProperty('--badge-color', el.dataset.badgeColor);
+    });
     function cellValue(cell, type) {
         if (type === 'date') {
             return cell.getAttribute('data-sort-value') || '';
@@ -156,5 +161,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.setAttribute('aria-label', data.starred ? 'Unstar article' : 'Star article');
             }
         });
+    });
+
+    // Read tracking — fire-and-forget POST when an outbound article link is clicked.
+    // De-emphasises the card immediately; server-side row persists across sessions.
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('a[target="_blank"]');
+        if (!link) return;
+        var card = link.closest('.article-card');
+        if (!card || !card.dataset.articleId) return;
+        var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        fetch('/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: '_csrf=' + encodeURIComponent(csrf) + '&article_id=' + encodeURIComponent(card.dataset.articleId)
+        });
+        card.classList.add('article-card--read');
     });
 });

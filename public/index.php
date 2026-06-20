@@ -66,6 +66,9 @@ $router->post('/password/reset/{token}', [AuthController::class,  'handleReset']
 $router->get('/starred',                   [StarController::class,  'list']);
 $router->post('/star',                     [StarController::class,  'toggle']);
 
+// ── Read tracking (auth required) ─────────────────────────────────────────────
+$router->post('/read',                     [FeedController::class,  'markRead']);
+
 // ── Personal RSS (token auth, no session required) ────────────────────────────
 $router->get('/feed/rss',                  [FeedController::class,  'rss']);
 

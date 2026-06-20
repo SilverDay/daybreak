@@ -11,7 +11,7 @@ use Daybreak\Security\Csrf;
 
   <section class="settings-section">
     <h2 class="settings-section-title">Feed preferences</h2>
-    <p class="form-hint" style="margin-bottom:1rem">
+    <p class="form-hint u-mb-1">
       Manage which sources appear in your feed:
       <a href="/settings/sources" class="form-link">Source preferences &rarr;</a>
     </p>
@@ -79,16 +79,16 @@ use Daybreak\Security\Csrf;
 
   <section class="settings-section">
     <h2 class="settings-section-title">Kioju bookmarks</h2>
-    <p class="form-hint" style="margin-bottom:1rem">
+    <p class="form-hint u-mb-1">
       Connect your Kioju API key to save article links directly from Daybreak.
     </p>
     <?php if ($hasKiojuKey): ?>
-      <p class="form-hint" style="margin-bottom:1rem">Status: Connected</p>
+      <p class="form-hint u-mb-1">Status: Connected</p>
     <?php else: ?>
-      <p class="form-hint" style="margin-bottom:1rem">Status: Not connected</p>
+      <p class="form-hint u-mb-1">Status: Not connected</p>
     <?php endif; ?>
 
-    <form method="post" action="/settings/account" style="margin-bottom:0.75rem">
+    <form method="post" action="/settings/account" class="u-mb-075">
       <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
       <input type="hidden" name="action" value="kioju_save">
       <div class="form-group">
