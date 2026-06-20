@@ -9,6 +9,8 @@ $pendingSuggestions = $pendingSuggestions ?? 0;
 $totalArticles = $totalArticles ?? 0;
 $sources = $sources ?? [];
 
+$topArticles = $topArticles ?? [];
+$topSources  = $topSources  ?? [];
 $healthSummary = $healthSummary ?? [
   'degraded' => 0,
   'auto_disabled' => 0,
@@ -176,4 +178,76 @@ foreach ($sources as $src) {
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="admin-section">
+  <div class="admin-section-header">
+    <h2 class="admin-section-title">Reading stats</h2>
+  </div>
+
+  <?php if ($topArticles === [] && $topSources === []): ?>
+    <p class="text-secondary text-sm">No read events recorded yet.</p>
+  <?php else: ?>
+  <div class="admin-read-stats-grid">
+
+    <div>
+      <p class="admin-subsection-title">Top articles &mdash; last 30 days</p>
+      <?php if ($topArticles === []): ?>
+        <p class="text-secondary text-sm">No data yet.</p>
+      <?php else: ?>
+      <div class="table-wrap">
+        <table class="admin-table admin-table--sm">
+          <thead>
+            <tr>
+              <th>Article</th>
+              <th>Source</th>
+              <th class="num">Reads</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($topArticles as $row): ?>
+              <tr>
+                <td class="text-truncate read-stats-article-col">
+                  <a href="<?= Html::e($row['url']) ?>" target="_blank" rel="noopener noreferrer nofollow">
+                    <?= Html::e(mb_substr($row['title'], 0, 80)) ?>
+                  </a>
+                </td>
+                <td class="text-secondary"><?= Html::e($row['source_name']) ?></td>
+                <td class="num"><?= (int) $row['reads'] ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php endif; ?>
+    </div>
+
+    <div>
+      <p class="admin-subsection-title">Top sources &mdash; all time</p>
+      <?php if ($topSources === []): ?>
+        <p class="text-secondary text-sm">No data yet.</p>
+      <?php else: ?>
+      <div class="table-wrap">
+        <table class="admin-table admin-table--sm">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th class="num">Reads</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($topSources as $row): ?>
+              <tr>
+                <td><?= Html::e($row['name']) ?></td>
+                <td class="num"><?= (int) $row['reads'] ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php endif; ?>
+    </div>
+
+  </div>
+  <?php endif; ?>
 </div>

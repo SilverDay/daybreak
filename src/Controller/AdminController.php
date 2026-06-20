@@ -113,6 +113,27 @@ final class AdminController
             }
         }
 
+        $topArticles = Database::query(
+            "SELECT a.id, a.title, a.url, s.name AS source_name, COUNT(*) AS reads
+             FROM user_article_reads r
+             JOIN articles a ON a.id = r.article_id
+             JOIN sources s ON s.id = a.source_id
+             WHERE r.read_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+             GROUP BY a.id, a.title, a.url, s.name
+             ORDER BY reads DESC
+             LIMIT 10"
+        )->fetchAll();
+
+        $topSources = Database::query(
+            "SELECT s.name, COUNT(*) AS reads
+             FROM user_article_reads r
+             JOIN articles a ON a.id = r.article_id
+             JOIN sources s ON s.id = a.source_id
+             GROUP BY s.id, s.name
+             ORDER BY reads DESC
+             LIMIT 10"
+        )->fetchAll();
+
         $title     = 'Admin — Dashboard';
         $adminNav  = 'dashboard';
         include DB_ROOT . '/src/View/admin_layout.php';
