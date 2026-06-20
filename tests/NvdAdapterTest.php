@@ -110,13 +110,19 @@ final class NvdAdapterTest extends TestCase
         return '?pubStartDate=' . urlencode($start) . '&pubEndDate=' . urlencode($end);
     }
 
+    private function apiKeySuffix(): string
+    {
+        $key = \Daybreak\Config::get('NVD_API_KEY');
+        return ($key !== null && $key !== '') ? '&apiKey=' . urlencode($key) : '';
+    }
+
     private function nvdProbeUrl(string $baseUrl): string
     {
-        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=1';
+        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=1' . $this->apiKeySuffix();
     }
 
     private function nvdPageUrl(string $baseUrl, int $startIndex): string
     {
-        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=20&startIndex=' . $startIndex;
+        return rtrim($baseUrl, '?&') . $this->nvdDateParams() . '&resultsPerPage=20&startIndex=' . $startIndex . $this->apiKeySuffix();
     }
 }

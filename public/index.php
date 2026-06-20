@@ -19,6 +19,7 @@ use Daybreak\Controller\SearchController;
 use Daybreak\Controller\SuggestController;
 use Daybreak\Controller\StarController;
 use Daybreak\Controller\UserController;
+use Daybreak\Controller\WebhookController;
 
 // DB-backed session handler must be registered before session_start().
 session_set_save_handler(new DbSessionHandler(), true);
@@ -86,8 +87,13 @@ $router->get('/settings/sources',         [UserController::class,  'showSources'
 $router->post('/settings/sources',         [UserController::class,  'handleSources']);
 
 // ── Watch terms (auth required) ───────────────────────────────────────────────
-$router->get('/settings/watch',           [UserController::class,  'showWatch']);
-$router->post('/settings/watch',           [UserController::class,  'handleWatch']);
+$router->get('/settings/watch',           [UserController::class,     'showWatch']);
+$router->post('/settings/watch',           [UserController::class,     'handleWatch']);
+
+// ── Webhooks (auth required) ──────────────────────────────────────────────────
+$router->get('/settings/webhooks',            [WebhookController::class, 'showWebhooks']);
+$router->post('/settings/webhooks',            [WebhookController::class, 'handleCreate']);
+$router->post('/settings/webhooks/{id}',       [WebhookController::class, 'handleUpdate']);
 
 // ── Source suggestions ────────────────────────────────────────────────────────
 $router->get('/suggest',              [SuggestController::class, 'show']);

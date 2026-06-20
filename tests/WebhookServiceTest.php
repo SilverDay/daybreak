@@ -1,0 +1,190 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Daybreak\Tests;
+
+use Daybreak\Adapter\NormalizedItem;
+use Daybreak\Service\WebhookService;
+
+/**
+ * Tests for WebhookService filter matching and payload building.
+ * DB-dependent methods (dispatch, retryFailed) are not covered here;
+ * the pure logic (matches, payload builders) is tested via Reflection.
+ */
+final class WebhookServiceTest extends TestCase
+{
+    private WebhookService $service;
+
+    public function setUp(): void
+    {
+        $this->service = new WebhookService(new FakeFetchClient([]));
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function callMatches(array $webhook, NormalizedItem $item, array $source): bool
+    {
+        $m = new \ReflectionMethod(WebhookService::class, 'matches');
+        $m->setAccessible(true);
+        return $m->invoke($this->service, $webhook, $item, $source);
+    }
+
+    private function callPayload(string $method, NormalizedItem $item, string $sourceName): array
+    {
+        $m = new \ReflectionMethod(WebhookService::class, $method);
+        $m->setAccessible(true);
+        return json_decode($m->invoke($this->service, $item, $sourceName), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function item(string $title, string $summary = ''): NormalizedItem
+    {
+        return new NormalizedItem(
+            guid:    'test-guid',
+            title:   $title,
+            url:     'https://example.test/article',
+            summary: $summary !== '' ? $summary : null,
+        );
+    }
+
+    private function webhook(?string $filterJson): array
+    {
+        return ['id' => 1, 'user_id' => 1, 'url' => 'https://example.test/hook',
+                'format' => 'generic', 'filter_json' => $filterJson, 'active' => 1];
+    }
+
+    private function source(string $categorySlug = 'critical'): array
+    {
+        return ['id' => 1, 'name' => 'Test Source', 'category_slug' => $categorySlug];
+    }
+
+    // ── Filter: no filter → match all ────────────────────────────────────────
+
+    public function testMatchesAllWhenFilterJsonIsNull(): void
+    {
+        $this->assertTrue($this->callMatches($this->webhook(null), $this->item('Any title'), $this->source()));
+    }
+
+    public function testMatchesAllWhenFilterJsonIsEmptyObject(): void
+    {
+        $this->assertTrue($this->callMatches($this->webhook('{}'), $this->item('Any title'), $this->source()));
+    }
+
+    public function testMatchesAllWhenBothArraysAreEmpty(): void
+    {
+        $this->assertTrue($this->callMatches(
+            $this->webhook('{"terms":[],"categories":[]}'),
+            $this->item('Any title'),
+            $this->source()
+        ));
+    }
+
+    // ── Filter: terms only ────────────────────────────────────────────────────
+
+    public function testTermMatchIsCaseInsensitive(): void
+    {
+        $wh = $this->webhook('{"terms":["CVE-2024"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('cve-2024-1234 exploited'), $this->source()));
+    }
+
+    public function testTermMatchInSummary(): void
+    {
+        $wh = $this->webhook('{"terms":["zero-day"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('Patch Tuesday', 'includes zero-day'), $this->source()));
+    }
+
+    public function testTermNoMatchReturnsFalse(): void
+    {
+        $wh = $this->webhook('{"terms":["ransomware"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('Routine patch released'), $this->source()));
+    }
+
+    public function testTermsAreOredTogetherAnyOneSuffices(): void
+    {
+        $wh = $this->webhook('{"terms":["ransomware","CVE-2024"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('CVE-2024-1234 patch'), $this->source()));
+    }
+
+    // ── Filter: categories only ───────────────────────────────────────────────
+
+    public function testCategoryMatchBySlug(): void
+    {
+        $wh = $this->webhook('{"categories":["critical"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('Anything'), $this->source('critical')));
+    }
+
+    public function testCategoryNoMatchReturnsFalse(): void
+    {
+        $wh = $this->webhook('{"categories":["ransomware"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('Anything'), $this->source('critical')));
+    }
+
+    // ── Filter: both set → AND logic ──────────────────────────────────────────
+
+    public function testAndLogic_termMatchButWrongCategory_returnsFalse(): void
+    {
+        $wh = $this->webhook('{"terms":["CVE"],"categories":["ransomware"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('CVE-2024 exploited'), $this->source('critical')));
+    }
+
+    public function testAndLogic_rightCategoryButNoTermMatch_returnsFalse(): void
+    {
+        $wh = $this->webhook('{"terms":["ransomware"],"categories":["critical"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('Routine patch'), $this->source('critical')));
+    }
+
+    public function testAndLogic_bothMet_returnsTrue(): void
+    {
+        $wh = $this->webhook('{"terms":["CVE"],"categories":["critical"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('CVE-2024 exploited'), $this->source('critical')));
+    }
+
+    // ── Payload builders ──────────────────────────────────────────────────────
+
+    public function testSlackPayloadStructure(): void
+    {
+        $item = $this->item('HIGH: SQL injection', 'Affects npm:foobar');
+        $payload = $this->callPayload('slackPayload', $item, 'GitHub Advisory');
+
+        $this->assertArrayHasKey('text', $payload);
+        $this->assertArrayHasKey('attachments', $payload);
+        $att = $payload['attachments'][0];
+        $this->assertSame('HIGH: SQL injection', $att['title']);
+        $this->assertSame('https://example.test/article', $att['title_link']);
+        $this->assertStringContains('Affects npm:foobar', $att['text']);
+        $this->assertStringContains('GitHub Advisory', $att['footer']);
+    }
+
+    public function testDiscordPayloadStructure(): void
+    {
+        $item = $this->item('CRITICAL: Zero-day', 'Actively exploited.');
+        $payload = $this->callPayload('discordPayload', $item, 'CISA KEV');
+
+        $this->assertArrayHasKey('embeds', $payload);
+        $embed = $payload['embeds'][0];
+        $this->assertSame('CRITICAL: Zero-day', $embed['title']);
+        $this->assertSame('https://example.test/article', $embed['url']);
+        $this->assertStringContains('Actively exploited.', $embed['description']);
+        $this->assertSame('CISA KEV', $embed['footer']['text']);
+    }
+
+    public function testGenericPayloadStructure(): void
+    {
+        $item = new NormalizedItem(
+            guid:        'g1',
+            title:       'Test advisory',
+            url:         'https://example.test/advisory',
+            summary:     'Short summary.',
+            publishedAt: new \DateTimeImmutable('2024-06-01T12:00:00Z'),
+        );
+        $payload = $this->callPayload('genericPayload', $item, 'Test Source');
+
+        $this->assertSame('new_article', $payload['event']);
+        $article = $payload['article'];
+        $this->assertSame('Test advisory', $article['title']);
+        $this->assertSame('https://example.test/advisory', $article['url']);
+        $this->assertSame('Short summary.', $article['summary']);
+        $this->assertSame('Test Source', $article['source']);
+        $this->assertSame('2024-06-01T12:00:00Z', $article['published_at']);
+    }
+}

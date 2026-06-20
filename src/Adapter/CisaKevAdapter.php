@@ -38,7 +38,7 @@ final class CisaKevAdapter implements SourceAdapter
         );
 
         if ($res['not_modified']) {
-            return new FetchResult([], 304, $res['etag'], $res['last_modified']);
+            return new FetchResult(notModified: true, etag: $res['etag'], lastModified: $res['last_modified']);
         }
 
         if ($res['status'] !== 200) {

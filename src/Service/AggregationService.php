@@ -27,17 +27,22 @@ final class AggregationService
     /** @var SourceAdapter[] */
     private array $adapters;
 
-    public function __construct(private readonly FeedFetcher $fetcher)
-    {
+    public function __construct(
+        private readonly FeedFetcher $fetcher,
+        private readonly WebhookService $webhooks,
+    ) {
         $this->adapters = [new RssAtomAdapter(), new RansomlookAdapter(), new NvdAdapter(), new CisaKevAdapter(), new JsonApiAdapter(), new GitHubAdvisoryAdapter()];
     }
 
     /** @return array{ok:int,errors:int} */
     public function runDue(bool $force = false): array
     {
-        $sql = $force
-            ? "SELECT * FROM sources WHERE status IN ('active','degraded','pending')"
-            : "SELECT * FROM sources WHERE status IN ('active','degraded','pending') AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())";
+        $this->webhooks->retryFailed();
+
+        $base = "SELECT s.*, c.slug AS category_slug
+                  FROM sources s LEFT JOIN source_categories c ON c.id = s.category_id
+                  WHERE s.status IN ('active','degraded','pending')";
+        $sql = $force ? $base : $base . ' AND (s.next_fetch_at IS NULL OR s.next_fetch_at <= NOW())';
         $sources = Database::query($sql)->fetchAll();
 
         $ok = 0;
@@ -70,12 +75,18 @@ final class AggregationService
                 return false;
             }
 
-            $new = 0;
+            $new      = 0;
+            $newItems = [];
             if (!$result->notModified) {
                 foreach ($result->items as $item) {
-                    $new += $this->upsert((int) $source['id'], $item);
+                    $inserted = $this->upsert((int) $source['id'], $item);
+                    $new += $inserted;
+                    if ($inserted === 1) {
+                        $newItems[] = $item;
+                    }
                 }
             }
+            $this->webhooks->dispatch($source, $newItems);
             $this->markSuccess($source, $result->etag, $result->lastModified);
             $this->log((int) $source['id'], $result->notModified ? 'not_modified' : 'ok', $result->httpStatus, count($result->items), $new, $started, null);
             return true;

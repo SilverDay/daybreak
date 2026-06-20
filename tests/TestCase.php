@@ -68,6 +68,24 @@ abstract class TestCase
         }
     }
 
+    protected function assertNotNull(mixed $value, string $message = ''): void
+    {
+        if ($value === null) {
+            $this->fail($message !== '' ? $message : 'Failed asserting that value is not null.');
+        }
+    }
+
+    protected function assertStringContains(string $needle, string $haystack, string $message = ''): void
+    {
+        if (!str_contains($haystack, $needle)) {
+            $this->fail($message !== '' ? $message : sprintf(
+                'Failed asserting that %s contains %s.',
+                $this->export($haystack),
+                $this->export($needle)
+            ));
+        }
+    }
+
     protected function expectException(string $exceptionClass, callable $callback, string $message = ''): void
     {
         try {
