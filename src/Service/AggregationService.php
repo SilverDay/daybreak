@@ -10,6 +10,7 @@ use Daybreak\Adapter\RssAtomAdapter;
 use Daybreak\Adapter\RansomlookAdapter;
 use Daybreak\Adapter\NvdAdapter;
 use Daybreak\Adapter\CisaKevAdapter;
+use Daybreak\Adapter\GitHubAdvisoryAdapter;
 use Daybreak\Adapter\JsonApiAdapter;
 use Throwable;
 
@@ -28,7 +29,7 @@ final class AggregationService
 
     public function __construct(private readonly FeedFetcher $fetcher)
     {
-        $this->adapters = [new RssAtomAdapter(), new RansomlookAdapter(), new NvdAdapter(), new CisaKevAdapter(), new JsonApiAdapter()];
+        $this->adapters = [new RssAtomAdapter(), new RansomlookAdapter(), new NvdAdapter(), new CisaKevAdapter(), new JsonApiAdapter(), new GitHubAdvisoryAdapter()];
     }
 
     /** @return array{ok:int,errors:int} */
