@@ -114,7 +114,16 @@ final class PublicController
         $currentUser = AuthService::currentUser();
         $canBookmarkToKioju = false;
         if ($currentUser !== null) {
-            $canBookmarkToKioju = KiojuService::hasApiKey((int) $currentUser['id']);
+            $userId = (int) $currentUser['id'];
+            $canBookmarkToKioju = KiojuService::hasApiKey($userId);
+
+            $readIds = array_flip(array_map('intval', Database::query(
+                'SELECT article_id FROM user_article_reads WHERE user_id = ?', [$userId]
+            )->fetchAll(\PDO::FETCH_COLUMN)));
+            foreach ($articles as &$a) {
+                $a['read'] = isset($readIds[(int) ($a['id'] ?? 0)]);
+            }
+            unset($a);
         }
 
         header('Content-Type: text/html; charset=utf-8');
