@@ -74,6 +74,11 @@ if (!function_exists('cveSeverityFromSummary')) {
                     <span
                         class="cve-severity cve-severity--<?= Html::e($severity) ?>"><?= Html::e(strtoupper($severity === 'unknown' ? 'unscored' : $severity)) ?></span>
                 </div>
+                <?php if ($ci['epss_score'] !== null): ?>
+                <?php $epssPercent = round((float)$ci['epss_score'] * 100, 1); ?>
+                <?php $epssLevel = $epssPercent >= 30.0 ? 'high' : ($epssPercent >= 5.0 ? 'medium' : 'low'); ?>
+                <span class="epss-badge epss-badge--<?= Html::e($epssLevel) ?>">EPSS <?= Html::e((string)$epssPercent) ?>%</span>
+                <?php endif; ?>
                 <?php if ($displaySummary !== ''): ?>
                 <p class="cve-summary"><?= Html::e(Html::sanitizeSummary($displaySummary, 180)) ?></p>
                 <?php endif; ?>

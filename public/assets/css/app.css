@@ -660,6 +660,36 @@ main {
   border-color: #cbd5e1;
 }
 
+.epss-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  margin: 0.2rem 0 0.15rem;
+  letter-spacing: 0.02em;
+}
+
+.epss-badge--low {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.epss-badge--medium {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.epss-badge--high {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
 /* ── Footer ─────────────────────────────────────────────────────────────────── */
 .site-footer {
   background: var(--color-header-bg);
@@ -2376,6 +2406,24 @@ textarea:focus-visible {
   color: #94a3b8;
   background: rgba(71, 85, 105, 0.18);
   border-color: rgba(71, 85, 105, 0.35);
+}
+
+[data-theme="dark"] .epss-badge--low {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+[data-theme="dark"] .epss-badge--medium {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+[data-theme="dark"] .epss-badge--high {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.25);
 }
 
 [data-theme="dark"] .admin-body {

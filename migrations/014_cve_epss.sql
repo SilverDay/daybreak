@@ -1,0 +1,6 @@
+CREATE TABLE cve_epss (
+    cve_id     VARCHAR(30) PRIMARY KEY,
+    epss_score DECIMAL(8,6) NOT NULL,
+    percentile DECIMAL(8,6) NOT NULL,
+    fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

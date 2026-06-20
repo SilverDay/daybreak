@@ -236,8 +236,8 @@ source by hand. OPML import turns a 30-minute task into 30 seconds.
 | 3 | Personal RSS output | Medium | High | Done 
 | 4 | Native starring | Medium | High | Done 
 | 6 | GitHub Advisory adapter | Medium | High | Done
-| 5 | Webhooks | Medium–High | High |
-| 1 | EPSS scores | Medium | Medium |
+| 5 | Webhooks | Medium–High | High | Done
+| 1 | EPSS scores | Medium | Medium | Done
 | 8 | Per-article read tracking | Medium | Medium |
 | 10 | OPML import | Low | Medium |
 

@@ -92,9 +92,11 @@ final class PublicController
         // CISA KEV dateAdded values reflect when CISA listed the CVE, not a publication date,
         // so filtering by the feed's time window would exclude all entries.
         $cveItems = Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at
+            "SELECT a.title, a.url, a.summary, a.published_at,
+                    e.epss_score, e.percentile
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type IN ('nvd','cisa_kev')
+             LEFT JOIN cve_epss e ON e.cve_id = a.guid
              ORDER BY a.published_at DESC
                LIMIT 50"
         )->fetchAll();

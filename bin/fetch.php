@@ -7,7 +7,9 @@ require __DIR__ . '/../src/bootstrap.php';
 
 use Daybreak\Database;
 use Daybreak\Service\FeedFetcher;
+use Daybreak\Service\WebhookService;
 use Daybreak\Service\AggregationService;
+use Daybreak\Service\EpssService;
 
 $opts   = getopt('', ['force', 'source:']);
 $force  = isset($opts['force']);
@@ -21,18 +23,28 @@ if ($acquired !== '1' && $acquired !== 1) {
     exit(1);
 }
 
-$svc = new AggregationService(new FeedFetcher());
+$fetcher  = new FeedFetcher();
+$webhooks = new WebhookService($fetcher);
+$svc      = new AggregationService($fetcher, $webhooks);
+$epss     = new EpssService($fetcher);
 
 if ($slug !== null) {
-    $source = Database::query('SELECT * FROM sources WHERE slug = ?', [$slug])->fetch();
+    $source = Database::query(
+        'SELECT s.*, c.slug AS category_slug
+         FROM sources s LEFT JOIN source_categories c ON c.id = s.category_id
+         WHERE s.slug = ?',
+        [$slug]
+    )->fetch();
     if (!$source) {
         fwrite(STDERR, "source not found: {$slug}\n");
         exit(1);
     }
     $ok = $svc->runSource($source);
+    $epss->refreshDue();
     echo $ok ? "ok\n" : "error\n";
 } else {
     $r = $svc->runDue($force);
+    $epss->refreshDue();
     echo "done: {$r['ok']} ok, {$r['errors']} errors\n";
 }
 
