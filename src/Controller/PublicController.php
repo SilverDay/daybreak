@@ -61,7 +61,7 @@ final class PublicController
         }
 
         $articles = DedupService::group(Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
+            "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text, s.status AS source_status,
                     s.last_recovered_at,
                     c.name AS category, c.slug AS cat_slug, c.color

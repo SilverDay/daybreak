@@ -13,7 +13,7 @@ use Daybreak\Security\Csrf;
   </div>
 <?php else: ?>
   <?php foreach ($articles as $a): ?>
-    <article class="article-card">
+    <article class="article-card" data-article-id="<?= (int) ($a['id'] ?? 0) ?>">
       <div class="article-meta">
         <span class="source-badge" data-badge-color="<?= Html::e($a['color'] ?? '#909090') ?>">
           <?= Html::e($a['source_name']) ?>
