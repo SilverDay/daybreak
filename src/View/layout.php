@@ -149,8 +149,8 @@ $ogType = (string) ($ogType ?? 'website');
   <meta name="twitter:image" content="<?= Html::e($socialImageUrl) ?>">
   <title><?= Html::e($title ?? 'Latest') ?> · Daybreak</title>
   <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">(function(){var s=localStorage.getItem('daybreak-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}());</script>
-  <link rel="stylesheet" href="/assets/css/app.css">
-  <script src="/assets/js/app.js" defer></script>
+  <link rel="stylesheet" href="/assets/css/app.css?v=<?= filemtime(DB_ROOT . '/public/assets/css/app.css') ?>">
+  <script src="/assets/js/app.js?v=<?= filemtime(DB_ROOT . '/public/assets/js/app.js') ?>" defer></script>
 </head>
 
 <body>

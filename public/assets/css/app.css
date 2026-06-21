@@ -305,6 +305,11 @@ main {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* ── Feed column (grid item) ────────────────────────────────────────────────── */
+.feed-column {
+  min-width: 0;
+}
+
 /* ── Article Cards ──────────────────────────────────────────────────────────── */
 .article-card {
   background: var(--color-card-bg);
@@ -370,6 +375,7 @@ main {
   font-weight: 600;
   line-height: 1.42;
   margin: 0 0 0.35rem;
+  overflow-wrap: break-word;
 }
 
 .article-title a {
@@ -1198,7 +1204,7 @@ main {
   }
 
   .content-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     padding: 0 var(--space-shell-x-mobile);
     margin-top: 1rem;
   }
@@ -1320,6 +1326,12 @@ main {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.admin-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-page-title {
