@@ -8,6 +8,7 @@ use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Security\Html;
 use Daybreak\Security\SsrfGuard;
+use Daybreak\Service\AuditLog;
 use Daybreak\Service\AuthService;
 
 /** User-facing webhook management: list, create, toggle, delete. */
@@ -97,6 +98,18 @@ final class WebhookController
             exit;
         }
 
+        $recentMutations = (int) Database::query(
+            "SELECT COUNT(*) FROM audit_log
+             WHERE user_id = ? AND action IN ('webhook.create','webhook.update')
+               AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
+            [$userId]
+        )->fetchColumn();
+        if ($recentMutations >= 5) {
+            $_SESSION['flash_error'] = 'Too many requests. Please wait a moment.';
+            header('Location: /settings/webhooks');
+            exit;
+        }
+
         $filterJson = $this->buildFilterJson($userId);
 
         Database::query(
@@ -104,6 +117,7 @@ final class WebhookController
              VALUES (?, ?, ?, ?, ?)',
             [$userId, $name, $url, $format, $filterJson]
         );
+        AuditLog::write('webhook.create', 'webhook', (string) Database::lastInsertId());
 
         $_SESSION['flash'] = 'Webhook added.';
         header('Location: /settings/webhooks');
@@ -130,12 +144,14 @@ final class WebhookController
                 'DELETE FROM user_webhooks WHERE id = ? AND user_id = ?',
                 [$webhookId, $userId]
             );
+            AuditLog::write('webhook.delete', 'webhook', (string) $webhookId);
             $_SESSION['flash'] = 'Webhook deleted.';
         } elseif ($action === 'toggle') {
             Database::query(
                 'UPDATE user_webhooks SET active = 1 - active WHERE id = ? AND user_id = ?',
                 [$webhookId, $userId]
             );
+            AuditLog::write('webhook.update', 'webhook', (string) $webhookId);
             $_SESSION['flash'] = 'Webhook updated.';
         }
 

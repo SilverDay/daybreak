@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Daybreak\Controller;
 
+use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Security\Html;
 use Daybreak\Service\AuthService;
@@ -26,6 +27,18 @@ final class SuggestController
     {
         AuthService::requireAuth();
         Csrf::check();
+
+        $userId   = (int) (AuthService::currentUser()['id'] ?? 0);
+        $dayCount = (int) Database::query(
+            'SELECT COUNT(*) FROM source_suggestions
+             WHERE suggested_by = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)',
+            [$userId]
+        )->fetchColumn();
+        if ($dayCount >= 5) {
+            $_SESSION['flash_error'] = 'You have reached the daily suggestion limit (5 per day).';
+            header('Location: /suggest');
+            exit;
+        }
 
         $name     = mb_substr(trim($_POST['name']         ?? ''), 0, 120);
         $homepage = mb_substr(trim($_POST['homepage_url'] ?? ''), 0, 500);

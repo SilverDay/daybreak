@@ -13,6 +13,7 @@ use Daybreak\Service\AuditLog;
 use Daybreak\Service\AuthService;
 use Daybreak\Service\FeedFetcher;
 use Daybreak\Service\SourcePreviewService;
+use Daybreak\Service\WebhookService;
 
 /**
  * Admin panel: source CRUD, suggestion moderation, feed health,
@@ -130,6 +131,7 @@ final class AdminController
              FROM user_article_reads r
              JOIN articles a ON a.id = r.article_id
              JOIN sources s ON s.id = a.source_id
+             WHERE r.read_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
              GROUP BY s.id, s.name
              ORDER BY read_count DESC
              LIMIT 10"
@@ -305,7 +307,7 @@ final class AdminController
         $source = $this->requireSource((int) ($args['id'] ?? 0));
         $id     = (int) $source['id'];
 
-        $svc = new AggregationService(new FeedFetcher());
+        $svc = new AggregationService(new FeedFetcher(), new WebhookService(new FeedFetcher()));
         // Reload fresh from DB before running (source may have just been reset).
         $fresh = Database::query('SELECT * FROM sources WHERE id = ?', [$id])->fetch();
         $ok    = $fresh ? $svc->runSource($fresh) : false;
@@ -321,6 +323,7 @@ final class AdminController
     public function suggestionsList(array $args = []): void
     {
         AuthService::requireAdmin();
+        AuditLog::write('suggestions.view', 'suggestions', '');
 
         $suggestions = Database::query(
             "SELECT ss.*, u.display_name AS suggester_name, rv.display_name AS reviewer_name
@@ -408,6 +411,7 @@ final class AdminController
     public function usersList(array $args = []): void
     {
         AuthService::requireAdmin();
+        AuditLog::write('users.view', 'users', '');
 
         $users = Database::query(
             "SELECT id, email, display_name, role, status, last_login_at, created_at
@@ -484,6 +488,7 @@ final class AdminController
     public function auditList(array $args = []): void
     {
         AuthService::requireAdmin();
+        AuditLog::write('audit.view', 'audit', '');
 
         $entries = Database::query(
             "SELECT al.id, al.action, al.target_type, al.target_id, al.created_at,
@@ -538,7 +543,15 @@ final class AdminController
             exit;
         }
 
-        $content = file_get_contents((string) $upload['tmp_name']);
+        $tmpDir  = realpath(sys_get_temp_dir()) ?: sys_get_temp_dir();
+        $tmpFile = realpath((string) ($upload['tmp_name'] ?? '')) ?: '';
+        if ($tmpFile === '' || !str_starts_with($tmpFile, $tmpDir . DIRECTORY_SEPARATOR)) {
+            $_SESSION['flash_error'] = 'Invalid upload path.';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        $content = file_get_contents($tmpFile);
         if ($content === false || $content === '') {
             $_SESSION['flash_error'] = 'Could not read uploaded file.';
             header('Location: /admin/sources/import-opml');

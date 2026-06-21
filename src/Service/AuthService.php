@@ -19,11 +19,17 @@ use PDOException;
  */
 final class AuthService
 {
-    private const MAX_EMAIL_FAILS = 5;
-    private const MAX_IP_FAILS    = 10;
-    private const THROTTLE_MIN    = 15;    // minutes
-    private const VERIFY_TTL_MIN  = 1440;  // 24 hours
-    private const RESET_TTL_MIN   = 60;    // 1 hour
+    private const MAX_EMAIL_FAILS    = 5;
+    private const MAX_IP_FAILS       = 10;
+    private const THROTTLE_MIN       = 15;    // minutes
+    private const THROTTLE_MIN_EXTENDED = 60; // escalated window for repeat offenders
+    private const VERIFY_TTL_MIN     = 1440;  // 24 hours
+    private const RESET_TTL_MIN      = 60;    // 1 hour
+    private const MAX_REGISTER_IP    = 10;    // register attempts per IP per hour
+    private const MAX_FORGOT_EMAIL   = 3;     // forgot-password per email per hour
+    private const MAX_FORGOT_IP      = 10;    // forgot-password per IP per hour
+    private const REGISTER_TTL_MIN   = 60;
+    private const FORGOT_TTL_MIN     = 60;
 
     private static ?array $userCache  = null;
     private static bool   $userLoaded = false;
@@ -447,20 +453,29 @@ final class AuthService
 
         $ipFails = (int) Database::query(
             'SELECT COUNT(*) FROM login_attempts
-             WHERE ip_hash = ? AND successful = 0
+             WHERE ip_hash = ? AND type = ? AND successful = 0
                AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)',
-            [$ipHash, self::THROTTLE_MIN]
+            [$ipHash, 'login', self::THROTTLE_MIN]
         )->fetchColumn();
 
         if ($ipFails >= self::MAX_IP_FAILS) {
             return true;
         }
 
+        // Escalate to 60-min window for accounts with >= 15 failures in the past 24h.
+        $emailFails24h = (int) Database::query(
+            'SELECT COUNT(*) FROM login_attempts
+             WHERE email = ? AND type = ? AND successful = 0
+               AND created_at > DATE_SUB(NOW(), INTERVAL 1440 MINUTE)',
+            [$email, 'login']
+        )->fetchColumn();
+        $window = $emailFails24h >= 15 ? self::THROTTLE_MIN_EXTENDED : self::THROTTLE_MIN;
+
         $emailFails = (int) Database::query(
             'SELECT COUNT(*) FROM login_attempts
-             WHERE email = ? AND successful = 0
+             WHERE email = ? AND type = ? AND successful = 0
                AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)',
-            [$email, self::THROTTLE_MIN]
+            [$email, 'login', $window]
         )->fetchColumn();
 
         return \Daybreak\Service\AuthLogic::shouldThrottle($ipFails, $emailFails, self::MAX_IP_FAILS, self::MAX_EMAIL_FAILS);
@@ -469,8 +484,57 @@ final class AuthService
     private static function recordAttempt(string $email, string $ip, bool $success): void
     {
         Database::query(
-            'INSERT INTO login_attempts (email, ip_hash, successful) VALUES (?, ?, ?)',
-            [$email, self::hashIp($ip), $success ? 1 : 0]
+            'INSERT INTO login_attempts (email, ip_hash, successful, type) VALUES (?, ?, ?, ?)',
+            [$email, self::hashIp($ip), $success ? 1 : 0, 'login']
+        );
+    }
+
+    public static function isRegisterThrottled(string $ip): bool
+    {
+        $ipHash = self::hashIp($ip);
+        $count  = (int) Database::query(
+            'SELECT COUNT(*) FROM login_attempts
+             WHERE type = ? AND ip_hash = ?
+               AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)',
+            ['register', $ipHash, self::REGISTER_TTL_MIN]
+        )->fetchColumn();
+        return $count >= self::MAX_REGISTER_IP;
+    }
+
+    public static function recordRegisterAttempt(string $email, string $ip): void
+    {
+        Database::query(
+            'INSERT INTO login_attempts (email, ip_hash, successful, type) VALUES (?, ?, 0, ?)',
+            [$email, self::hashIp($ip), 'register']
+        );
+    }
+
+    public static function isForgotThrottled(string $email, string $ip): bool
+    {
+        $ipHash    = self::hashIp($ip);
+        $emailFail = (int) Database::query(
+            'SELECT COUNT(*) FROM login_attempts
+             WHERE type = ? AND email = ?
+               AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)',
+            ['forgot', $email, self::FORGOT_TTL_MIN]
+        )->fetchColumn();
+        if ($emailFail >= self::MAX_FORGOT_EMAIL) {
+            return true;
+        }
+        $ipFail = (int) Database::query(
+            'SELECT COUNT(*) FROM login_attempts
+             WHERE type = ? AND ip_hash = ?
+               AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)',
+            ['forgot', $ipHash, self::FORGOT_TTL_MIN]
+        )->fetchColumn();
+        return $ipFail >= self::MAX_FORGOT_IP;
+    }
+
+    public static function recordForgotAttempt(string $email, string $ip): void
+    {
+        Database::query(
+            'INSERT INTO login_attempts (email, ip_hash, successful, type) VALUES (?, ?, 0, ?)',
+            [$email, self::hashIp($ip), 'forgot']
         );
     }
 

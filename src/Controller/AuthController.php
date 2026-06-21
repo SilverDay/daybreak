@@ -26,6 +26,17 @@ final class AuthController
         $email    = trim($_POST['email']    ?? '');
         $password = $_POST['password']      ?? '';
         $name     = trim($_POST['name']     ?? '');
+        $ip       = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        // Record first so even rejected requests consume quota.
+        AuthService::recordRegisterAttempt($email, $ip);
+        if (AuthService::isRegisterThrottled($ip)) {
+            // Identical message — no enumeration, no throttle disclosure.
+            $_SESSION['flash'] = 'If this email address is not already registered, '
+                . 'you\'ll receive a verification link shortly. Please check your inbox.';
+            header('Location: /login');
+            exit;
+        }
 
         try {
             AuthService::register($email, $password, $name);
@@ -103,7 +114,18 @@ final class AuthController
         Csrf::check();
 
         $email = trim($_POST['email'] ?? '');
+        $ip    = $_SERVER['REMOTE_ADDR'] ?? '';
+
         if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            // Record first so even rejected requests consume quota.
+            AuthService::recordForgotAttempt($email, $ip);
+            if (AuthService::isForgotThrottled($email, $ip)) {
+                // Identical message — no enumeration, no throttle disclosure.
+                $_SESSION['flash'] = 'If your email address is registered and active, '
+                    . 'you\'ll receive a password reset link shortly.';
+                header('Location: /password/forgot');
+                exit;
+            }
             AuthService::forgotPassword($email);
         }
 
