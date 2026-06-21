@@ -123,6 +123,11 @@ $router->post('/admin/suggestions/{id}',         [AdminController::class, 'handl
 $router->get('/admin/users',                    [AdminController::class, 'usersList']);
 $router->post('/admin/users/{id}',               [AdminController::class, 'handleUser']);
 $router->get('/admin/audit',                    [AdminController::class, 'auditList']);
+$router->get('/admin/categories',               [AdminController::class, 'categoriesList']);
+$router->get('/admin/categories/create',        [AdminController::class, 'categoryCreate']);
+$router->post('/admin/categories/create',        [AdminController::class, 'handleCategoryCreate']);
+$router->get('/admin/categories/{id}',          [AdminController::class, 'categoryEdit']);
+$router->post('/admin/categories/{id}',          [AdminController::class, 'handleCategoryEdit']);
 
 // ── Legal / static pages ───────────────────────────────────────────────────────
 $router->get('/imprint', [PageController::class, 'imprint']);

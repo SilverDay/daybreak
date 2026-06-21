@@ -109,6 +109,7 @@ $seoDescription = (string) ($seoDescription ?? 'Administrative pages for Daybrea
       <a href="/admin/sources" class="admin-nav-link<?= $_adminNav === 'sources'     ? ' is-active' : '' ?>">Sources</a>
       <a href="/admin/suggestions" class="admin-nav-link<?= $_adminNav === 'suggestions' ? ' is-active' : '' ?>">Suggestions</a>
       <a href="/admin/users" class="admin-nav-link<?= $_adminNav === 'users'       ? ' is-active' : '' ?>">Users</a>
+      <a href="/admin/categories" class="admin-nav-link<?= $_adminNav === 'categories' ? ' is-active' : '' ?>">Categories</a>
       <a href="/admin/audit" class="admin-nav-link<?= $_adminNav === 'audit'       ? ' is-active' : '' ?>">Audit Log</a>
     </div>
   </div>

@@ -937,4 +937,197 @@ final class AdminController
         $usedInBatch[$candidate] = true;
         return $candidate;
     }
+
+    // ── Categories ────────────────────────────────────────────────────────────
+
+    public function categoriesList(array $args = []): void
+    {
+        AuthService::requireAdmin();
+
+        $categories = Database::query(
+            "SELECT c.*, COUNT(s.id) AS source_count
+             FROM source_categories c
+             LEFT JOIN sources s ON s.category_id = c.id
+             GROUP BY c.id
+             ORDER BY c.sort_order, c.name"
+        )->fetchAll();
+
+        $title    = 'Admin — Categories';
+        $adminNav = 'categories';
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/categories/list.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    public function categoryCreate(array $args = []): void
+    {
+        AuthService::requireAdmin();
+
+        $title    = 'Admin — New category';
+        $adminNav = 'categories';
+        $isCreate = true;
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/categories/form.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    public function handleCategoryCreate(array $args = []): void
+    {
+        AuthService::requireAdmin();
+        Csrf::check();
+
+        [$fields, $errors] = $this->validateCategoryInput($_POST);
+
+        if ($errors !== []) {
+            $title    = 'Admin — New category';
+            $adminNav = 'categories';
+            $isCreate = true;
+            $formErrors = $errors;
+            $category = array_merge(['id' => null, 'slug' => '', 'sort_order' => 0], $fields);
+            include DB_ROOT . '/src/View/admin_layout.php';
+            include DB_ROOT . '/src/View/admin/categories/form.php';
+            include DB_ROOT . '/src/View/admin_layout_end.php';
+            return;
+        }
+
+        $slug = $fields['slug'] !== ''
+            ? $fields['slug']
+            : $this->makeSlug($fields['name']);
+
+        if (Database::query('SELECT id FROM source_categories WHERE slug = ? LIMIT 1', [$slug])->fetch()) {
+            $slug .= '-' . substr(bin2hex(random_bytes(2)), 0, 4);
+        }
+
+        Database::query(
+            'INSERT INTO source_categories (name, slug, color, sort_order) VALUES (?, ?, ?, ?)',
+            [$fields['name'], $slug, $fields['color'] ?: null, $fields['sort_order']]
+        );
+        $id = (int) Database::lastInsertId();
+
+        AuditLog::write('category.create', 'category', $slug);
+        $_SESSION['flash'] = "Category \"{$fields['name']}\" created.";
+        header('Location: /admin/categories/' . $id);
+        exit;
+    }
+
+    public function categoryEdit(array $args = []): void
+    {
+        AuthService::requireAdmin();
+
+        $category = $this->requireCategory((int) ($args['id'] ?? 0));
+
+        $title    = 'Admin — Edit category';
+        $adminNav = 'categories';
+        $isCreate = false;
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/categories/form.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    public function handleCategoryEdit(array $args = []): void
+    {
+        AuthService::requireAdmin();
+        Csrf::check();
+
+        $category = $this->requireCategory((int) ($args['id'] ?? 0));
+        $id       = (int) $category['id'];
+        $action   = (string) ($_POST['action'] ?? 'save');
+
+        if ($action === 'delete') {
+            $sourceCount = (int) Database::query(
+                'SELECT COUNT(*) FROM sources WHERE category_id = ?', [$id]
+            )->fetchColumn();
+
+            if ($sourceCount > 0) {
+                $_SESSION['flash_error'] = "Cannot delete: {$sourceCount} source(s) still assigned to this category. Reassign them first.";
+                header('Location: /admin/categories/' . $id);
+                exit;
+            }
+
+            $name = $category['name'];
+            Database::query('DELETE FROM source_categories WHERE id = ?', [$id]);
+            AuditLog::write('category.delete', 'category', $name);
+            $_SESSION['flash'] = "Category \"{$name}\" deleted.";
+            header('Location: /admin/categories');
+            exit;
+        }
+
+        [$fields, $errors] = $this->validateCategoryInput($_POST);
+
+        if ($errors !== []) {
+            $title      = 'Admin — Edit category';
+            $adminNav   = 'categories';
+            $isCreate   = false;
+            $formErrors = $errors;
+            $category   = array_merge($category, $fields);
+            include DB_ROOT . '/src/View/admin_layout.php';
+            include DB_ROOT . '/src/View/admin/categories/form.php';
+            include DB_ROOT . '/src/View/admin_layout_end.php';
+            return;
+        }
+
+        $slug = $fields['slug'] !== '' ? $fields['slug'] : $this->makeSlug($fields['name']);
+        $existing = Database::query(
+            'SELECT id FROM source_categories WHERE slug = ? AND id != ? LIMIT 1', [$slug, $id]
+        )->fetch();
+        if ($existing) {
+            $slug .= '-' . substr(bin2hex(random_bytes(2)), 0, 4);
+        }
+
+        Database::query(
+            'UPDATE source_categories SET name = ?, slug = ?, color = ?, sort_order = ? WHERE id = ?',
+            [$fields['name'], $slug, $fields['color'] ?: null, $fields['sort_order'], $id]
+        );
+
+        AuditLog::write('category.update', 'category', $slug);
+        $_SESSION['flash'] = 'Category updated.';
+        header('Location: /admin/categories/' . $id);
+        exit;
+    }
+
+    /**
+     * @return array{array{name:string,slug:string,color:string,sort_order:int},list<string>}
+     */
+    private function validateCategoryInput(array $post): array
+    {
+        $errors = [];
+
+        $name = trim((string) ($post['name'] ?? ''));
+        if ($name === '') {
+            $errors[] = 'Name is required.';
+        } elseif (mb_strlen($name) > 80) {
+            $errors[] = 'Name must be 80 characters or fewer.';
+        }
+
+        $slug = trim((string) ($post['slug'] ?? ''));
+        if ($slug !== '' && !preg_match('/\A[a-z0-9-]+\z/', $slug)) {
+            $errors[] = 'Slug may only contain lowercase letters, numbers, and hyphens.';
+        }
+        if (mb_strlen($slug) > 80) {
+            $errors[] = 'Slug must be 80 characters or fewer.';
+        }
+
+        $color = trim((string) ($post['color'] ?? ''));
+        if ($color !== '' && !preg_match('/\A#[0-9a-fA-F]{6}\z/', $color)) {
+            $errors[] = 'Color must be a valid hex value (e.g. #3498db).';
+        }
+
+        $sortOrder = (int) ($post['sort_order'] ?? 0);
+
+        return [
+            ['name' => $name, 'slug' => $slug, 'color' => $color, 'sort_order' => $sortOrder],
+            $errors,
+        ];
+    }
+
+    private function requireCategory(int $id): array
+    {
+        $cat = Database::query('SELECT * FROM source_categories WHERE id = ?', [$id])->fetch();
+        if (!$cat) {
+            http_response_code(404);
+            echo 'Category not found.';
+            exit;
+        }
+        return $cat;
+    }
 }
