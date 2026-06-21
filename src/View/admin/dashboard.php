@@ -213,7 +213,7 @@ foreach ($sources as $src) {
                   </a>
                 </td>
                 <td class="text-secondary"><?= Html::e($row['source_name']) ?></td>
-                <td class="num"><?= (int) $row['reads'] ?></td>
+                <td class="num"><?= (int) $row['read_count'] ?></td>
               </tr>
             <?php endforeach; ?>
           </tbody>
@@ -239,7 +239,7 @@ foreach ($sources as $src) {
             <?php foreach ($topSources as $row): ?>
               <tr>
                 <td><?= Html::e($row['name']) ?></td>
-                <td class="num"><?= (int) $row['reads'] ?></td>
+                <td class="num"><?= (int) $row['read_count'] ?></td>
               </tr>
             <?php endforeach; ?>
           </tbody>

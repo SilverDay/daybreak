@@ -113,6 +113,8 @@ $router->get('/admin',                          [AdminController::class, 'dashbo
 $router->get('/admin/sources',                  [AdminController::class, 'sourcesList']);
 $router->get('/admin/sources/create',           [AdminController::class, 'sourceCreate']);
 $router->post('/admin/sources/create',           [AdminController::class, 'handleSourceCreate']);
+$router->get('/admin/sources/import-opml',      [AdminController::class, 'showOpmlImport']);
+$router->post('/admin/sources/import-opml',      [AdminController::class, 'handleOpmlImport']);
 $router->get('/admin/sources/{id}',             [AdminController::class, 'sourceEdit']);
 $router->post('/admin/sources/{id}',             [AdminController::class, 'handleSourceEdit']);
 $router->post('/admin/sources/{id}/fetch',       [AdminController::class, 'sourceFetch']);

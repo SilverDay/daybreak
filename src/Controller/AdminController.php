@@ -7,6 +7,7 @@ namespace Daybreak\Controller;
 use Daybreak\Database;
 use Daybreak\Security\Csrf;
 use Daybreak\Security\Html;
+use Daybreak\Security\SsrfGuard;
 use Daybreak\Service\AggregationService;
 use Daybreak\Service\AuditLog;
 use Daybreak\Service\AuthService;
@@ -114,23 +115,23 @@ final class AdminController
         }
 
         $topArticles = Database::query(
-            "SELECT a.id, a.title, a.url, s.name AS source_name, COUNT(*) AS reads
+            "SELECT a.id, a.title, a.url, s.name AS source_name, COUNT(*) AS read_count
              FROM user_article_reads r
              JOIN articles a ON a.id = r.article_id
              JOIN sources s ON s.id = a.source_id
              WHERE r.read_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
              GROUP BY a.id, a.title, a.url, s.name
-             ORDER BY reads DESC
+             ORDER BY read_count DESC
              LIMIT 10"
         )->fetchAll();
 
         $topSources = Database::query(
-            "SELECT s.name, COUNT(*) AS reads
+            "SELECT s.name, COUNT(*) AS read_count
              FROM user_article_reads r
              JOIN articles a ON a.id = r.article_id
              JOIN sources s ON s.id = a.source_id
              GROUP BY s.id, s.name
-             ORDER BY reads DESC
+             ORDER BY read_count DESC
              LIMIT 10"
         )->fetchAll();
 
@@ -500,6 +501,119 @@ final class AdminController
         include DB_ROOT . '/src/View/admin_layout_end.php';
     }
 
+    // ── OPML import ───────────────────────────────────────────────────────────
+
+    public function showOpmlImport(array $args = []): void
+    {
+        AuthService::requireAdmin();
+        $title    = 'Admin — Import OPML';
+        $adminNav = 'sources';
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/sources/import_opml.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    public function handleOpmlImport(array $args = []): void
+    {
+        AuthService::requireAdmin();
+        Csrf::check();
+
+        $upload = $_FILES['opml'] ?? null;
+        if (!is_array($upload) || ((int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE)) !== UPLOAD_ERR_OK) {
+            $_SESSION['flash_error'] = 'No file uploaded or upload error.';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        $ext = strtolower(pathinfo((string) ($upload['name'] ?? ''), PATHINFO_EXTENSION));
+        if (!in_array($ext, ['opml', 'xml'], true)) {
+            $_SESSION['flash_error'] = 'File must have an .opml or .xml extension.';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        if ((int) ($upload['size'] ?? 0) > 2 * 1024 * 1024) {
+            $_SESSION['flash_error'] = 'File too large (max 2 MB).';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        $content = file_get_contents((string) $upload['tmp_name']);
+        if ($content === false || $content === '') {
+            $_SESSION['flash_error'] = 'Could not read uploaded file.';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        // External entity loading is disabled by default in PHP 8.0+; LIBXML_NONET blocks network access.
+        $xml = @simplexml_load_string($content, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        if ($xml === false || strtolower($xml->getName()) !== 'opml') {
+            $_SESSION['flash_error'] = 'File does not appear to be a valid OPML document.';
+            header('Location: /admin/sources/import-opml');
+            exit;
+        }
+
+        $outlines  = $this->extractOpmlOutlines($xml);
+        $truncated = false;
+        if (count($outlines) > 500) {
+            $outlines  = array_slice($outlines, 0, 500);
+            $truncated = true;
+        }
+
+        $admin          = AuthService::currentUser();
+        $created        = 0;
+        $skippedDup     = 0;
+        $skippedInvalid = 0;
+        $usedSlugs      = [];
+
+        foreach ($outlines as $entry) {
+            $xmlUrl  = trim((string) ($entry['xmlUrl'] ?? ''));
+            $htmlUrl = trim((string) ($entry['htmlUrl'] ?? ''));
+            $text    = trim((string) ($entry['text'] ?? ''));
+
+            if ($xmlUrl === '' || !$this->isHttpUrl($xmlUrl)) {
+                $skippedInvalid++;
+                continue;
+            }
+
+            try {
+                SsrfGuard::assertSafe($xmlUrl);
+            } catch (\RuntimeException) {
+                $skippedInvalid++;
+                continue;
+            }
+
+            $existing = Database::query('SELECT id FROM sources WHERE feed_url = ? LIMIT 1', [$xmlUrl])->fetch();
+            if ($existing) {
+                $skippedDup++;
+                continue;
+            }
+
+            $name        = $text !== '' ? mb_substr($text, 0, 120) : mb_substr((string) (parse_url($xmlUrl, PHP_URL_HOST) ?: $xmlUrl), 0, 120);
+            $homepageUrl = ($htmlUrl !== '' && $this->isHttpUrl($htmlUrl)) ? $htmlUrl : $xmlUrl;
+            $slug        = $this->generateUniqueSlug($name, $usedSlugs);
+
+            Database::query(
+                'INSERT INTO sources
+                 (name, slug, homepage_url, feed_url, adapter_type, category_id,
+                  attribution_text, status, fetch_interval_min, created_by)
+                 VALUES (?,?,?,?,?,?,?,?,?,?)',
+                [$name, $slug, $homepageUrl, $xmlUrl, 'rss_atom', null, $name, 'pending', 15, (int) $admin['id']]
+            );
+            $created++;
+        }
+
+        AuditLog::write('source.opml_import', 'source', "created:{$created} dup:{$skippedDup} invalid:{$skippedInvalid}");
+
+        $msg = "OPML import complete: {$created} added, {$skippedDup} skipped (duplicate), {$skippedInvalid} skipped (invalid/blocked URL).";
+        if ($truncated) {
+            $msg .= ' File was truncated to 500 entries.';
+        }
+        $_SESSION['flash'] = $msg;
+        header('Location: /admin/sources');
+        exit;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function requireSource(int $id): array
@@ -770,5 +884,44 @@ final class AdminController
 
         $scheme = parse_url($url, PHP_URL_SCHEME);
         return is_string($scheme) && in_array(strtolower($scheme), ['http', 'https'], true);
+    }
+
+    /** @return array<int,array{text:string,xmlUrl:string,htmlUrl:string}> */
+    private function extractOpmlOutlines(\SimpleXMLElement $node): array
+    {
+        $results = [];
+        foreach ($node->children() as $child) {
+            $xmlUrl = trim((string) ($child['xmlUrl'] ?? ''));
+            if ($xmlUrl !== '') {
+                $results[] = [
+                    'text'    => (string) ($child['text'] ?? ''),
+                    'xmlUrl'  => $xmlUrl,
+                    'htmlUrl' => (string) ($child['htmlUrl'] ?? ''),
+                ];
+            } else {
+                foreach ($this->extractOpmlOutlines($child) as $sub) {
+                    $results[] = $sub;
+                }
+            }
+        }
+        return $results;
+    }
+
+    /** @param array<string,bool> $usedInBatch */
+    private function generateUniqueSlug(string $base, array &$usedInBatch): string
+    {
+        $slug = $this->makeSlug($base);
+        if ($slug === '') {
+            $slug = 'source';
+        }
+
+        if (!isset($usedInBatch[$slug]) && !Database::query('SELECT id FROM sources WHERE slug = ? LIMIT 1', [$slug])->fetch()) {
+            $usedInBatch[$slug] = true;
+            return $slug;
+        }
+
+        $candidate = $slug . '-' . substr(bin2hex(random_bytes(2)), 0, 4);
+        $usedInBatch[$candidate] = true;
+        return $candidate;
     }
 }

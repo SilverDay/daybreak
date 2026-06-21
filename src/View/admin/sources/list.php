@@ -34,7 +34,10 @@ $relativeAge = static function (?string $raw) use ($now): string {
 ?>
 <div class="admin-page-header">
   <h1 class="admin-page-title">Sources</h1>
-  <a href="/admin/sources/create" class="btn btn-primary">+ Add source</a>
+  <div class="admin-page-header-actions">
+    <a href="/admin/sources/import-opml" class="btn btn-secondary">Import OPML</a>
+    <a href="/admin/sources/create" class="btn btn-primary">+ Add source</a>
+  </div>
 </div>
 
 <div class="table-wrap">
