@@ -22,11 +22,17 @@ final class FeedFetcher implements FetchClient
 
     public function __construct(private readonly string $userAgent = '') {}
 
+    public static function resolveUa(string $override = ''): string
+    {
+        return $override !== ''
+            ? $override
+            : (Config::get('FETCH_USER_AGENT')
+                ?: 'Mozilla/5.0 (compatible; DaybreakAggregator/0.1; +https://daybreak.silverday.de)');
+    }
+
     private function ua(): string
     {
-        return $this->userAgent
-            ?: (Config::get('FETCH_USER_AGENT')
-                ?: 'Mozilla/5.0 (compatible; DaybreakAggregator/0.1; +https://daybreak.silverday.de)');
+        return self::resolveUa($this->userAgent);
     }
 
     /**
@@ -207,6 +213,80 @@ final class FeedFetcher implements FetchClient
             'last_modified' => null,
             'not_modified'  => false,
         ];
+    }
+
+    /**
+     * Diagnostic raw fetch — not part of the FetchClient interface, used by the admin debug panel only.
+     * Returns HTTP status, raw response headers, body snippet, timing, and the effective UA sent.
+     *
+     * @return array{status:int,raw_headers:string,body_snippet:string,body_length:int,content_type:?string,etag:?string,last_modified:?string,not_modified:bool,duration_ms:int,effective_ua:string,final_url:string,redirect_count:int}
+     */
+    public function getRaw(string $url): array
+    {
+        $started   = microtime(true);
+        $redirects = 0;
+        $finalUrl  = $url;
+
+        while (true) {
+            SsrfGuard::assertSafe($url);
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER   => true,
+                CURLOPT_HEADER           => true,
+                CURLOPT_FOLLOWLOCATION   => false,
+                CURLOPT_CONNECTTIMEOUT   => 8,
+                CURLOPT_TIMEOUT          => self::TIMEOUT_S,
+                CURLOPT_USERAGENT        => $this->ua(),
+                CURLOPT_HTTPHEADER       => ['Accept: application/rss+xml, application/atom+xml, application/xml, application/json;q=0.9, */*;q=0.5'],
+                CURLOPT_PROTOCOLS        => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_BUFFERSIZE       => 16384,
+                CURLOPT_NOPROGRESS       => false,
+                CURLOPT_SSLVERSION       => CURL_SSLVERSION_TLSv1_2 | CURL_SSLVERSION_MAX_TLSv1_2,
+                CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
+                    return $dlNow > self::MAX_BYTES ? 1 : 0;
+                },
+            ]);
+
+            $raw    = curl_exec($ch);
+            $errno  = curl_errno($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $hdrLen = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            curl_close($ch);
+
+            if ($errno !== 0 || $raw === false) {
+                throw new RuntimeException('fetch failed: curl errno ' . $errno);
+            }
+
+            $rawHeaders = substr($raw, 0, $hdrLen);
+            $body       = substr($raw, $hdrLen);
+
+            if (in_array($status, [301, 302, 303, 307, 308], true)) {
+                if (++$redirects > self::MAX_REDIRECTS) {
+                    throw new RuntimeException('too many redirects');
+                }
+                if (preg_match('/^location:\s*(.+)$/im', $rawHeaders, $m)) {
+                    $finalUrl = $url = $this->resolveRedirect($url, trim($m[1]));
+                    continue;
+                }
+                throw new RuntimeException('redirect without Location');
+            }
+
+            return [
+                'status'         => $status,
+                'raw_headers'    => trim($rawHeaders),
+                'body_snippet'   => mb_substr($body, 0, 1000),
+                'body_length'    => strlen($body),
+                'content_type'   => $this->header($rawHeaders, 'content-type'),
+                'etag'           => $this->header($rawHeaders, 'etag'),
+                'last_modified'  => $this->header($rawHeaders, 'last-modified'),
+                'not_modified'   => $status === 304,
+                'duration_ms'    => (int) ((microtime(true) - $started) * 1000),
+                'effective_ua'   => $this->ua(),
+                'final_url'      => $finalUrl,
+                'redirect_count' => $redirects,
+            ];
+        }
     }
 
     private function resolveRedirect(string $base, string $location): string

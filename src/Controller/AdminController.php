@@ -225,12 +225,15 @@ final class AdminController
         AuthService::requireAdmin();
         $source = $this->requireSource((int) ($args['id'] ?? 0));
 
-        $categories = Database::query('SELECT id, name FROM source_categories ORDER BY sort_order')->fetchAll();
-        $recentLog  = Database::query(
+        $categories   = Database::query('SELECT id, name FROM source_categories ORDER BY sort_order')->fetchAll();
+        $recentLog    = Database::query(
             'SELECT status, http_status, items_found, items_new, duration_ms, error, created_at
              FROM fetch_log WHERE source_id = ? ORDER BY created_at DESC LIMIT 10',
             [(int) $source['id']]
         )->fetchAll();
+        $articleCount = (int) Database::query('SELECT COUNT(*) FROM articles WHERE source_id = ?', [(int) $source['id']])->fetchColumn();
+        $effectiveUa  = FeedFetcher::resolveUa((string) ($source['user_agent_override'] ?? ''));
+        $debugResult  = null;
 
         $title    = 'Admin — Edit source';
         $adminNav = 'sources';
@@ -261,6 +264,10 @@ final class AdminController
 
             case 'preview':
                 $this->renderSourceFormPreview($source, $_POST);
+                return;
+
+            case 'debug_fetch':
+                $this->renderSourceFormDebug($source);
                 return;
 
             case 'enable':
@@ -667,6 +674,7 @@ final class AdminController
         $license = (string) $input['license'];
         $language = $input['language'];
         $interval = (int) $input['fetch_interval_min'];
+        $uaOverride = $input['user_agent_override'] !== '' ? $input['user_agent_override'] : null;
 
         if ($slug === '') {
             $slug = $this->makeSlug($name);
@@ -685,8 +693,9 @@ final class AdminController
             Database::query(
                 'INSERT INTO sources
                  (name, slug, homepage_url, feed_url, adapter_type, category_id,
-                  attribution_text, license, language, fetch_interval_min, field_map, status)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                  attribution_text, license, language, fetch_interval_min, field_map,
+                  user_agent_override, status)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $name,
                     $slug,
@@ -699,6 +708,7 @@ final class AdminController
                     $language,
                     $interval,
                     $fieldMapJson,
+                    $uaOverride,
                     'pending'
                 ]
             );
@@ -707,7 +717,8 @@ final class AdminController
 
         Database::query(
             'UPDATE sources SET name=?, slug=?, homepage_url=?, feed_url=?, adapter_type=?,
-             category_id=?, attribution_text=?, license=?, language=?, fetch_interval_min=?, field_map=?
+             category_id=?, attribution_text=?, license=?, language=?, fetch_interval_min=?, field_map=?,
+             user_agent_override=?
              WHERE id=?',
             [
                 $name,
@@ -721,6 +732,7 @@ final class AdminController
                 $language,
                 $interval,
                 $fieldMapJson,
+                $uaOverride,
                 $id
             ]
         );
@@ -735,7 +747,7 @@ final class AdminController
     }
 
     /**
-     * @return array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,language:?string,fetch_interval_min:int,field_map:string}
+     * @return array{name:string,slug:string,homepage_url:string,feed_url:string,adapter_type:string,category_id:?int,attribution_text:string,license:string,language:?string,fetch_interval_min:int,field_map:string,user_agent_override:string}
      */
     private function normalizeSourceInput(array $post): array
     {
@@ -753,6 +765,7 @@ final class AdminController
             'language' => in_array($rawLang, $allowedLanguages, true) ? $rawLang : null,
             'fetch_interval_min' => max(1, min(1440, (int) ($post['fetch_interval_min'] ?? 15))),
             'field_map' => trim((string) ($post['field_map'] ?? '')),
+            'user_agent_override' => mb_substr(trim((string) ($post['user_agent_override'] ?? '')), 0, 255),
         ];
     }
 
@@ -804,21 +817,73 @@ final class AdminController
         $source = $this->sourceFromInput($input, $existingSource);
         $previewResult = null;
 
+        $articleCount = 0;
         if ($existingSource !== null) {
             $recentLog  = Database::query(
                 'SELECT status, http_status, items_found, items_new, duration_ms, error, created_at
                  FROM fetch_log WHERE source_id = ? ORDER BY created_at DESC LIMIT 10',
                 [(int) $existingSource['id']]
             )->fetchAll();
+            $articleCount = (int) Database::query('SELECT COUNT(*) FROM articles WHERE source_id = ?', [(int) $existingSource['id']])->fetchColumn();
         }
+        $effectiveUa = FeedFetcher::resolveUa($input['user_agent_override']);
+        $debugResult = null;
 
         if ($formErrors === []) {
-            $preview = (new SourcePreviewService(new FeedFetcher()))->preview($source);
+            $preview = (new SourcePreviewService(new FeedFetcher($input['user_agent_override'])))->preview($source);
             $previewResult = $preview;
         }
 
         $isCreate = $existingSource === null;
         $title    = $isCreate ? 'Admin — New source' : 'Admin — Edit source';
+        $adminNav = 'sources';
+        include DB_ROOT . '/src/View/admin_layout.php';
+        include DB_ROOT . '/src/View/admin/sources/edit.php';
+        include DB_ROOT . '/src/View/admin_layout_end.php';
+    }
+
+    private function renderSourceFormDebug(array $source): void
+    {
+        $categories   = Database::query('SELECT id, name FROM source_categories ORDER BY sort_order')->fetchAll();
+        $recentLog    = Database::query(
+            'SELECT status, http_status, items_found, items_new, duration_ms, error, created_at
+             FROM fetch_log WHERE source_id = ? ORDER BY created_at DESC LIMIT 10',
+            [(int) $source['id']]
+        )->fetchAll();
+        $articleCount = (int) Database::query('SELECT COUNT(*) FROM articles WHERE source_id = ?', [(int) $source['id']])->fetchColumn();
+        $uaOverride   = (string) ($source['user_agent_override'] ?? '');
+        $effectiveUa  = FeedFetcher::resolveUa($uaOverride);
+        $previewResult = null;
+        $debugResult   = null;
+
+        $feedUrl = (string) ($source['feed_url'] ?? '');
+        if ($feedUrl !== '') {
+            $fetcher = new FeedFetcher($uaOverride);
+            try {
+                $debugResult = $fetcher->getRaw($feedUrl);
+            } catch (\Throwable $e) {
+                $debugResult = [
+                    'error'          => $e->getMessage(),
+                    'status'         => 0,
+                    'raw_headers'    => '',
+                    'body_snippet'   => '',
+                    'body_length'    => 0,
+                    'content_type'   => null,
+                    'etag'           => null,
+                    'last_modified'  => null,
+                    'not_modified'   => false,
+                    'duration_ms'    => 0,
+                    'effective_ua'   => $effectiveUa,
+                    'final_url'      => $feedUrl,
+                    'redirect_count' => 0,
+                ];
+            }
+        } else {
+            $debugResult = ['error' => 'No feed URL configured for this source.'];
+        }
+
+        $isCreate = false;
+        $title    = 'Admin — Edit source';
         $adminNav = 'sources';
         include DB_ROOT . '/src/View/admin_layout.php';
         include DB_ROOT . '/src/View/admin/sources/edit.php';
@@ -848,8 +913,9 @@ final class AdminController
         $source['attribution_text'] = $input['attribution_text'];
         $source['license'] = $input['license'];
         $source['language'] = $input['language'];
-        $source['fetch_interval_min'] = $input['fetch_interval_min'];
-        $source['field_map'] = $input['field_map'];
+        $source['fetch_interval_min']   = $input['fetch_interval_min'];
+        $source['field_map']            = $input['field_map'];
+        $source['user_agent_override']  = $input['user_agent_override'];
 
         return $source;
     }

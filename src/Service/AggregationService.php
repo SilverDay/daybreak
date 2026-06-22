@@ -63,7 +63,11 @@ final class AggregationService
         }
 
         try {
-            $result = $adapter->fetch($source, $this->fetcher);
+            $ua = isset($source['user_agent_override']) && $source['user_agent_override'] !== ''
+                ? (string) $source['user_agent_override']
+                : '';
+            $fetcher = $ua !== '' ? new FeedFetcher($ua) : $this->fetcher;
+            $result = $adapter->fetch($source, $fetcher);
 
             // Treat 202 (Cloudflare soft-block) and 4xx/5xx as failures so that
             // consecutive_failures increments and sources can be degraded/auto-disabled.

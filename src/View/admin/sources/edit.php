@@ -10,6 +10,9 @@ $categories = $categories ?? [];
 $isCreate = isset($isCreate) ? (bool) $isCreate : ($source === null);
 $formErrors = $formErrors ?? [];
 $previewResult = $previewResult ?? null;
+$debugResult = $debugResult ?? null;
+$articleCount = $articleCount ?? null;
+$effectiveUa = $effectiveUa ?? null;
 $s = $source ?? [
   'id' => null,
   'name' => '',
@@ -23,6 +26,7 @@ $s = $source ?? [
   'language' => null,
   'fetch_interval_min' => 15,
   'field_map' => '',
+  'user_agent_override' => '',
   'status' => 'pending',
   'consecutive_failures' => 0,
   'last_error' => null,
@@ -164,6 +168,13 @@ $languageOptions = [
         <textarea id="src-fieldmap" class="form-input form-textarea" name="field_map"
           placeholder='{"title": "headline", "url": "link"}'><?= Html::e($s['field_map'] ?? '') ?></textarea>
       </div>
+      <div class="form-group">
+        <label class="form-label" for="src-ua-override">User-Agent override (optional)</label>
+        <input id="src-ua-override" class="form-input" type="text" name="user_agent_override"
+          value="<?= Html::e($s['user_agent_override'] ?? '') ?>" maxlength="255"
+          placeholder="Leave blank to use the global default">
+        <p class="form-help">Override the fetch User-Agent for this source only. Use the aggregator UA for sources that block browser UAs (e.g. <code>Mozilla/5.0 (compatible; DaybreakAggregator/0.1; +https://daybreak.silverday.de)</code>).</p>
+      </div>
     </div>
 
     <div class="form-actions">
@@ -253,7 +264,129 @@ $languageOptions = [
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
           <button type="submit" class="btn btn-secondary btn-sm">Fetch now</button>
         </form>
+
+        <form method="post" action="/admin/sources/<?= (int) $s['id'] ?>">
+          <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
+          <button type="submit" class="btn btn-secondary btn-sm" name="action" value="debug_fetch">Debug fetch</button>
+        </form>
       </div>
+    </div>
+
+    <?php if ($debugResult !== null): ?>
+      <div class="settings-section">
+        <h2 class="settings-section-title">Debug fetch result</h2>
+        <?php if (!empty($debugResult['error'])): ?>
+          <div class="flash flash-error preview-msg"><?= Html::e($debugResult['error']) ?></div>
+        <?php else: ?>
+          <ul class="source-health" style="margin-bottom:1rem">
+            <li class="source-health__item">
+              <span class="source-health__label">HTTP status</span>
+              <span class="source-health__value<?= ($debugResult['status'] ?? 0) >= 400 ? ' text-danger' : '' ?>"><?= (int) ($debugResult['status'] ?? 0) ?></span>
+            </li>
+            <li class="source-health__item">
+              <span class="source-health__label">Content-Type</span>
+              <span class="source-health__value"><?= Html::e($debugResult['content_type'] ?? '—') ?></span>
+            </li>
+            <li class="source-health__item">
+              <span class="source-health__label">Body size</span>
+              <span class="source-health__value"><?= number_format((int) ($debugResult['body_length'] ?? 0)) ?> bytes</span>
+            </li>
+            <li class="source-health__item">
+              <span class="source-health__label">Duration</span>
+              <span class="source-health__value"><?= (int) ($debugResult['duration_ms'] ?? 0) ?> ms</span>
+            </li>
+            <li class="source-health__item">
+              <span class="source-health__label">Redirects</span>
+              <span class="source-health__value"><?= (int) ($debugResult['redirect_count'] ?? 0) ?></span>
+            </li>
+            <?php if (($debugResult['final_url'] ?? '') !== ($s['feed_url'] ?? '')): ?>
+              <li class="source-health__item" style="grid-column:1/-1">
+                <span class="source-health__label">Final URL</span>
+                <span class="source-health__value"><?= Html::e($debugResult['final_url'] ?? '') ?></span>
+              </li>
+            <?php endif; ?>
+            <li class="source-health__item" style="grid-column:1/-1">
+              <span class="source-health__label">User-Agent sent</span>
+              <span class="source-health__value"><?= Html::e($debugResult['effective_ua'] ?? '') ?></span>
+            </li>
+          </ul>
+          <?php if (!empty($debugResult['etag']) || !empty($debugResult['last_modified'])): ?>
+            <p class="text-sm text-secondary" style="margin-bottom:0.75rem">
+              ETag: <code><?= Html::e($debugResult['etag'] ?? '—') ?></code>
+              &nbsp;·&nbsp;
+              Last-Modified: <code><?= Html::e($debugResult['last_modified'] ?? '—') ?></code>
+            </p>
+          <?php endif; ?>
+          <p class="text-sm text-secondary" style="margin-bottom:0.25rem">Response headers</p>
+          <pre class="debug-pre"><?= Html::e($debugResult['raw_headers'] ?? '') ?></pre>
+          <?php if (!empty($debugResult['body_snippet'])): ?>
+            <p class="text-sm text-secondary" style="margin-top:1rem;margin-bottom:0.25rem">Response body (first 1000 bytes)</p>
+            <pre class="debug-pre"><?= Html::e($debugResult['body_snippet']) ?></pre>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <div class="settings-section">
+      <h2 class="settings-section-title">Diagnostics</h2>
+      <ul class="source-health">
+        <li class="source-health__item">
+          <span class="source-health__label">Status</span>
+          <span class="source-health__value">
+            <span class="status-pill status-pill--<?= Html::e((string) $s['status']) ?>"><?= Html::e((string) $s['status']) ?></span>
+            <?php if ((int) ($s['consecutive_failures'] ?? 0) > 0): ?>
+              <span class="health-flag health-flag--warn"><?= (int) $s['consecutive_failures'] ?> failure<?= (int) $s['consecutive_failures'] !== 1 ? 's' : '' ?></span>
+            <?php endif; ?>
+          </span>
+        </li>
+        <li class="source-health__item">
+          <span class="source-health__label">Articles in DB</span>
+          <span class="source-health__value"><?= $articleCount !== null ? number_format($articleCount) : '—' ?></span>
+        </li>
+        <li class="source-health__item">
+          <span class="source-health__label">Next fetch</span>
+          <span class="source-health__value"><?= !empty($s['next_fetch_at']) ? Html::e((new DateTimeImmutable($s['next_fetch_at']))->format('M j H:i')) : '—' ?></span>
+        </li>
+        <li class="source-health__item">
+          <span class="source-health__label">Last success</span>
+          <span class="source-health__value"><?= !empty($s['last_success_at']) ? Html::e((new DateTimeImmutable($s['last_success_at']))->format('M j H:i')) : '—' ?></span>
+        </li>
+        <li class="source-health__item">
+          <span class="source-health__label">Conditional GET</span>
+          <span class="source-health__value">
+            <?php if (!empty($s['etag']) || !empty($s['last_modified_hdr'])): ?>
+              active <span class="text-secondary text-sm">(<?= !empty($s['etag']) ? 'ETag' : '' ?><?= !empty($s['etag']) && !empty($s['last_modified_hdr']) ? ' + ' : '' ?><?= !empty($s['last_modified_hdr']) ? 'Last-Modified' : '' ?>)</span>
+            <?php else: ?>
+              <span class="text-secondary">—</span>
+            <?php endif; ?>
+          </span>
+        </li>
+        <?php if (!empty($s['etag'])): ?>
+          <li class="source-health__item" style="grid-column:1/-1">
+            <span class="source-health__label">ETag</span>
+            <span class="source-health__value"><code><?= Html::e((string) $s['etag']) ?></code></span>
+          </li>
+        <?php endif; ?>
+        <?php if (!empty($s['last_modified_hdr'])): ?>
+          <li class="source-health__item" style="grid-column:1/-1">
+            <span class="source-health__label">Last-Modified</span>
+            <span class="source-health__value"><code><?= Html::e((string) $s['last_modified_hdr']) ?></code></span>
+          </li>
+        <?php endif; ?>
+        <li class="source-health__item" style="grid-column:1/-1">
+          <span class="source-health__label">Effective User-Agent</span>
+          <span class="source-health__value">
+            <?= Html::e($effectiveUa ?? '—') ?>
+            <?php if (!empty($s['user_agent_override'])): ?><span class="health-flag">override</span><?php endif; ?>
+          </span>
+        </li>
+        <?php if (!empty($s['last_error'])): ?>
+          <li class="source-health__item" style="grid-column:1/-1">
+            <span class="source-health__label">Last error</span>
+            <span class="source-health__value text-danger"><?= Html::e((string) $s['last_error']) ?></span>
+          </li>
+        <?php endif; ?>
+      </ul>
     </div>
 
     <?php if (!empty($recentLog)): ?>
