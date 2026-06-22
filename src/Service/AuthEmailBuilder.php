@@ -43,6 +43,41 @@ final class AuthEmailBuilder
         ]);
     }
 
+    public static function adminNewUserBody(string $email, string $displayName): string
+    {
+        $manageUrl = self::appUrl('/admin/users');
+
+        return implode("\r\n", [
+            'A new user has registered on Daybreak.',
+            '',
+            'Display name : ' . $displayName,
+            'Email        : ' . $email,
+            'Registered   : ' . date('r'),
+            'Status       : pending (awaiting email verification)',
+            '',
+            'Manage users: ' . $manageUrl,
+        ]);
+    }
+
+    public static function adminNewSuggestionBody(string $name, string $homepage, ?array $user): string
+    {
+        $reviewUrl   = self::appUrl('/admin/suggestions');
+        $submittedBy = $user
+            ? ($user['display_name'] ?? '') . ' (' . ($user['email'] ?? '') . ')'
+            : 'anonymous';
+
+        return implode("\r\n", [
+            'A new source suggestion has been submitted on Daybreak.',
+            '',
+            'Source name  : ' . $name,
+            'Homepage     : ' . $homepage,
+            'Submitted by : ' . $submittedBy,
+            'Submitted at : ' . date('r'),
+            '',
+            'Review suggestions: ' . $reviewUrl,
+        ]);
+    }
+
     public static function appUrl(string $path): string
     {
         $base = trim((string) (getenv('APP_BASE_URL') ?: Config::get('APP_BASE_URL', 'https://daybreak.silverday.de')));

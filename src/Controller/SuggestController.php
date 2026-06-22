@@ -77,6 +77,12 @@ final class SuggestController
             $probe
         );
 
+        try {
+            (new \Daybreak\Service\MailService())->sendAdminNewSuggestion($name, $homepage, $user);
+        } catch (\Throwable) {
+            // non-fatal
+        }
+
         $_SESSION['flash'] = 'Thanks — your suggestion has been submitted for review.';
         header('Location: /suggest');
         exit;

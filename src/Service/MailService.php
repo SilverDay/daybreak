@@ -24,6 +24,24 @@ final class MailService
         $this->send($to, 'Verify your Daybreak account', AuthEmailBuilder::verificationBody($rawToken));
     }
 
+    public function sendAdminNewUser(string $email, string $displayName): void
+    {
+        $admin = Config::get('ADMIN_NOTIFY_EMAIL');
+        if ($admin === null || $admin === '') {
+            return;
+        }
+        $this->send($admin, '[Daybreak] New user registered', AuthEmailBuilder::adminNewUserBody($email, $displayName));
+    }
+
+    public function sendAdminNewSuggestion(string $name, string $homepage, ?array $user): void
+    {
+        $admin = Config::get('ADMIN_NOTIFY_EMAIL');
+        if ($admin === null || $admin === '') {
+            return;
+        }
+        $this->send($admin, '[Daybreak] New source suggestion', AuthEmailBuilder::adminNewSuggestionBody($name, $homepage, $user));
+    }
+
     public function send(string $to, string $subject, string $body): void
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {

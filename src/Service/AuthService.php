@@ -108,6 +108,11 @@ final class AuthService
 
         $userId = (int) Database::lastInsertId();
         self::sendVerificationEmail($userId, $email);
+        try {
+            (new \Daybreak\Service\MailService())->sendAdminNewUser($email, $displayName);
+        } catch (\Throwable) {
+            // non-fatal — never block registration over a missing admin notification
+        }
     }
 
     public static function verifyEmail(string $rawToken): bool

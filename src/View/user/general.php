@@ -54,7 +54,9 @@ use Daybreak\Security\Csrf;
   <section class="settings-section">
     <h2 class="settings-section-title">Kioju bookmarks</h2>
     <p class="form-hint u-mb-1">
-      Connect your Kioju API key to save article links directly from Daybreak.
+      <a href="https://kioju.de" target="_blank" rel="noopener noreferrer nofollow">Kioju</a>
+      is a personal bookmarking and read-later service — save links, tag them, and access them from any device.
+      Connect your API key below to bookmark articles from Daybreak with one click.
     </p>
     <?php if ($hasKiojuKey): ?>
       <p class="form-hint u-mb-1">Status: <strong>Connected</strong></p>
