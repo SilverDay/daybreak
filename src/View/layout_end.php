@@ -101,6 +101,7 @@ if (!function_exists('cveSeverityFromSummary')) {
     <p>
         &copy; <?= date('Y') ?> <a href="https://silverday.media/" target="_blank"
             rel="noopener noreferrer nofollow">SilverDay Media</a> &middot;
+        <a href="/about">About</a> &middot;
         <a href="/imprint">Imprint</a> &middot;
         <a href="/terms">Terms</a> &middot;
         <a href="/privacy">Privacy</a><br>

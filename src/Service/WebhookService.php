@@ -13,11 +13,12 @@ use Daybreak\Database;
  * Called from AggregationService after each successful source fetch. Runs synchronously
  * in the cron process — delivery is fast enough at self-hosted article volumes.
  *
- * Filter semantics (filter_json = {"terms":[...],"categories":[...]}):
- *   - Neither set  → match all articles
+ * Filter semantics (filter_json = {"terms":[...],"categories":[...],"sources":[...]}):
+ *   - No keys set  → match all articles
  *   - Terms only   → match if any term appears in title or summary (case-insensitive)
- *   - Categories only → match if source category slug is in the list
- *   - Both set     → AND: must satisfy both the term check AND the category check
+ *   - Categories   → match if source category slug is in the list
+ *   - Sources      → match if source slug is in the list
+ *   - Multiple set → AND: article must satisfy every filter type that is present
  *
  * SSRF guard is applied inside FetchClient::postJson() on every delivery attempt.
  */
@@ -129,7 +130,7 @@ final class WebhookService
 
     /**
      * @param array{id:int,filter_json:?string} $webhook
-     * @param array{name:string,category_slug:?string} $source
+     * @param array{slug:string,name:string,category_slug:?string} $source
      */
     private function matches(array $webhook, NormalizedItem $item, array $source): bool
     {
@@ -138,10 +139,11 @@ final class WebhookService
             $filter = json_decode($webhook['filter_json'], true) ?? [];
         }
 
-        $terms = array_filter((array) ($filter['terms'] ?? []));
-        $cats  = array_filter((array) ($filter['categories'] ?? []));
+        $terms   = array_filter((array) ($filter['terms']      ?? []));
+        $cats    = array_filter((array) ($filter['categories'] ?? []));
+        $sources = array_filter((array) ($filter['sources']    ?? []));
 
-        if ($terms === [] && $cats === []) {
+        if ($terms === [] && $cats === [] && $sources === []) {
             return true;
         }
 
@@ -158,16 +160,22 @@ final class WebhookService
 
         $catMatch = $cats === [];
         if (!$catMatch) {
-            $slug = (string) ($source['category_slug'] ?? '');
+            $catSlug = (string) ($source['category_slug'] ?? '');
             foreach ($cats as $c) {
-                if ($slug === (string) $c) {
+                if ($catSlug === (string) $c) {
                     $catMatch = true;
                     break;
                 }
             }
         }
 
-        return $termMatch && $catMatch;
+        $sourceMatch = $sources === [];
+        if (!$sourceMatch) {
+            $srcSlug = (string) ($source['slug'] ?? '');
+            $sourceMatch = in_array($srcSlug, array_map('strval', $sources), true);
+        }
+
+        return $termMatch && $catMatch && $sourceMatch;
     }
 
     private function slackPayload(NormalizedItem $item, string $sourceName): string

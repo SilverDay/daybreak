@@ -130,6 +130,7 @@ $router->get('/admin/categories/{id}',          [AdminController::class, 'catego
 $router->post('/admin/categories/{id}',          [AdminController::class, 'handleCategoryEdit']);
 
 // ── Legal / static pages ───────────────────────────────────────────────────────
+$router->get('/about',   [PageController::class, 'about']);
 $router->get('/imprint', [PageController::class, 'imprint']);
 $router->get('/terms',   [PageController::class, 'terms']);
 $router->get('/privacy', [PageController::class, 'privacy']);

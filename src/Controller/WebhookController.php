@@ -32,6 +32,10 @@ final class WebhookController
             'SELECT slug, name FROM source_categories ORDER BY sort_order'
         )->fetchAll();
 
+        $activeSources = Database::query(
+            "SELECT slug, name FROM sources WHERE status IN ('active','degraded') ORDER BY name"
+        )->fetchAll();
+
         $recentLog = Database::query(
             'SELECT wl.webhook_id, wl.article_title, wl.status, wl.http_status, wl.created_at
              FROM webhook_log wl
@@ -42,8 +46,8 @@ final class WebhookController
             [$userId]
         )->fetchAll();
 
-        $title       = 'Webhooks';
-        $settingsNav = 'webhooks';
+        $title         = 'Webhooks';
+        $settingsNav   = 'webhooks';
 
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/settings_layout.php';
@@ -161,8 +165,8 @@ final class WebhookController
 
     /**
      * Build a filter_json string from POST data, or null if no filters set.
-     * Validates terms (max 20, each ≤ 80 chars, stripped of HTML) and
-     * category slugs (checked against real slugs from the DB).
+     * Validates terms (max 20, each ≤ 80 chars, stripped of HTML),
+     * category slugs, and source slugs (both checked against real DB values).
      */
     private function buildFilterJson(int $userId): ?string
     {
@@ -179,21 +183,31 @@ final class WebhookController
         }
 
         $submittedCats = (array) ($_POST['filter_categories'] ?? []);
-        $validSlugs    = Database::query(
+        $validCatSlugs = Database::query(
             'SELECT slug FROM source_categories'
         )->fetchAll(\PDO::FETCH_COLUMN);
-        $validSlugSet  = array_flip($validSlugs);
+        $validCatSet   = array_flip($validCatSlugs);
         $cats          = array_values(array_filter(
             array_map('strval', $submittedCats),
-            static fn($s) => isset($validSlugSet[$s])
+            static fn($s) => isset($validCatSet[$s])
         ));
 
-        if ($terms === [] && $cats === []) {
+        $submittedSrcs  = (array) ($_POST['filter_sources'] ?? []);
+        $validSrcSlugs  = Database::query(
+            "SELECT slug FROM sources WHERE status IN ('active','degraded')"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $validSrcSet    = array_flip($validSrcSlugs);
+        $sources        = array_values(array_filter(
+            array_map('strval', $submittedSrcs),
+            static fn($s) => isset($validSrcSet[$s])
+        ));
+
+        if ($terms === [] && $cats === [] && $sources === []) {
             return null;
         }
 
         return json_encode(
-            array_filter(['terms' => $terms, 'categories' => $cats]),
+            array_filter(['terms' => $terms, 'categories' => $cats, 'sources' => $sources]),
             JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
     }

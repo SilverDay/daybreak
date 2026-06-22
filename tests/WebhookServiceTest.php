@@ -53,9 +53,9 @@ final class WebhookServiceTest extends TestCase
                 'format' => 'generic', 'filter_json' => $filterJson, 'active' => 1];
     }
 
-    private function source(string $categorySlug = 'critical'): array
+    private function source(string $categorySlug = 'critical', string $slug = 'test-source'): array
     {
-        return ['id' => 1, 'name' => 'Test Source', 'category_slug' => $categorySlug];
+        return ['id' => 1, 'name' => 'Test Source', 'slug' => $slug, 'category_slug' => $categorySlug];
     }
 
     // ── Filter: no filter → match all ────────────────────────────────────────
@@ -119,6 +119,26 @@ final class WebhookServiceTest extends TestCase
         $this->assertFalse($this->callMatches($wh, $this->item('Anything'), $this->source('critical')));
     }
 
+    // ── Filter: sources only ─────────────────────────────────────────────────
+
+    public function testSourceMatchBySlug(): void
+    {
+        $wh = $this->webhook('{"sources":["bleeping"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('Anything'), $this->source('critical', 'bleeping')));
+    }
+
+    public function testSourceNoMatchReturnsFalse(): void
+    {
+        $wh = $this->webhook('{"sources":["krebs"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('Anything'), $this->source('critical', 'bleeping')));
+    }
+
+    public function testSourceMatchIsExact(): void
+    {
+        $wh = $this->webhook('{"sources":["bleeping","krebs"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('Anything'), $this->source('critical', 'krebs')));
+    }
+
     // ── Filter: both set → AND logic ──────────────────────────────────────────
 
     public function testAndLogic_termMatchButWrongCategory_returnsFalse(): void
@@ -137,6 +157,18 @@ final class WebhookServiceTest extends TestCase
     {
         $wh = $this->webhook('{"terms":["CVE"],"categories":["critical"]}');
         $this->assertTrue($this->callMatches($wh, $this->item('CVE-2024 exploited'), $this->source('critical')));
+    }
+
+    public function testAndLogic_termAndSourceMet_returnsTrue(): void
+    {
+        $wh = $this->webhook('{"terms":["CVE"],"sources":["bleeping"]}');
+        $this->assertTrue($this->callMatches($wh, $this->item('CVE-2024 exploited'), $this->source('critical', 'bleeping')));
+    }
+
+    public function testAndLogic_termMetButWrongSource_returnsFalse(): void
+    {
+        $wh = $this->webhook('{"terms":["CVE"],"sources":["krebs"]}');
+        $this->assertFalse($this->callMatches($wh, $this->item('CVE-2024 exploited'), $this->source('critical', 'bleeping')));
     }
 
     // ── Payload builders ──────────────────────────────────────────────────────

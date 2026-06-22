@@ -5,12 +5,14 @@ declare(strict_types=1);
 use Daybreak\Security\Html;
 use Daybreak\Security\Csrf;
 
-/** @var array $webhooks    rows from user_webhooks */
-/** @var array $categories  rows of {slug, name} */
-/** @var array $recentLog   recent webhook_log rows */
-$webhooks   = $webhooks   ?? [];
-$categories = $categories ?? [];
-$recentLog  = $recentLog  ?? [];
+/** @var array $webhooks       rows from user_webhooks */
+/** @var array $categories     rows of {slug, name} */
+/** @var array $activeSources  rows of {slug, name} — active/degraded sources */
+/** @var array $recentLog      recent webhook_log rows */
+$webhooks      = $webhooks      ?? [];
+$categories    = $categories    ?? [];
+$activeSources = $activeSources ?? [];
+$recentLog     = $recentLog     ?? [];
 
 $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Generic JSON'];
 ?>
@@ -20,8 +22,8 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
     <h2 class="settings-section-title">Webhooks</h2>
     <p class="form-hint u-mb-1">
       Push new articles to Slack, Discord, or any HTTP endpoint on every cron tick.
-      Filters are optional &mdash; leave both blank to receive all new articles.
-      When both terms <em>and</em> categories are set, the article must match both.
+      Filters are optional &mdash; leave all blank to receive all new articles.
+      When multiple filter types are set, the article must satisfy all of them.
     </p>
 
     <?php if ($webhooks !== []): ?>
@@ -30,6 +32,7 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
           $filter  = json_decode($wh['filter_json'] ?? '{}', true) ?? [];
           $terms   = implode(', ', (array) ($filter['terms']      ?? []));
           $cats    = implode(', ', (array) ($filter['categories'] ?? []));
+          $srcs    = implode(', ', (array) ($filter['sources']    ?? []));
           $active  = (bool) $wh['active'];
           $fmtLabel = $formatLabels[$wh['format']] ?? Html::e($wh['format']);
         ?>
@@ -50,11 +53,13 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
               </form>
             </div>
             <div class="form-hint webhook-item-detail"><?= Html::e(mb_substr($wh['url'], 0, 80)) ?><?= mb_strlen($wh['url']) > 80 ? '…' : '' ?></div>
-            <?php if ($terms !== '' || $cats !== ''): ?>
+            <?php if ($terms !== '' || $cats !== '' || $srcs !== ''): ?>
               <div class="form-hint webhook-item-detail">
                 <?php if ($terms !== ''): ?>Terms: <strong><?= Html::e($terms) ?></strong><?php endif; ?>
                 <?php if ($terms !== '' && $cats !== ''): ?> &middot; <?php endif; ?>
                 <?php if ($cats !== ''): ?>Categories: <strong><?= Html::e($cats) ?></strong><?php endif; ?>
+                <?php if (($terms !== '' || $cats !== '') && $srcs !== ''): ?> &middot; <?php endif; ?>
+                <?php if ($srcs !== ''): ?>Sources: <strong><?= Html::e($srcs) ?></strong><?php endif; ?>
               </div>
             <?php else: ?>
               <div class="form-hint webhook-item-detail">No filter &mdash; receives all new articles</div>
@@ -111,6 +116,21 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
               <?php endforeach; ?>
             </div>
             <p class="form-hint">Article source must belong to at least one checked category.</p>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($activeSources !== []): ?>
+          <div class="form-group">
+            <span class="form-label">Filter: sources <span class="label-normal">(optional)</span></span>
+            <div class="cat-filter-grid" style="max-height:12rem;overflow-y:auto;">
+              <?php foreach ($activeSources as $src): ?>
+                <label class="cat-filter-label">
+                  <input type="checkbox" name="filter_sources[]" value="<?= Html::e($src['slug']) ?>">
+                  <?= Html::e($src['name']) ?>
+                </label>
+              <?php endforeach; ?>
+            </div>
+            <p class="form-hint">Article must come from at least one of the selected sources.</p>
           </div>
         <?php endif; ?>
 

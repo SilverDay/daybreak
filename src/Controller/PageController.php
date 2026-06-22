@@ -10,6 +10,18 @@ use Daybreak\Security\Html;
 /** Static legal / informational pages. */
 final class PageController
 {
+    public function about(array $args = []): void
+    {
+        $title          = 'About';
+        $activeNav      = 'about';
+        $showWidgets    = false;
+        $showFilterBar  = false;
+        $seoDescription = 'Learn what Daybreak is, how it works, and what features are available.';
+        include DB_ROOT . '/src/View/layout.php';
+        include DB_ROOT . '/src/View/page/about.php';
+        include DB_ROOT . '/src/View/layout_end.php';
+    }
+
     public function imprint(array $args = []): void
     {
         $title         = 'Imprint';
@@ -60,7 +72,7 @@ final class PageController
     public function sitemap(array $args = []): void
     {
         $baseUrl = $this->baseUrl();
-        $paths = ['/', '/imprint', '/terms', '/privacy'];
+        $paths = ['/', '/about', '/imprint', '/terms', '/privacy'];
 
         header('Content-Type: application/xml; charset=utf-8');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
