@@ -16,8 +16,10 @@ final class SuggestController
     {
         AuthService::requireAuth();
 
-        $title     = 'Suggest a source';
-        $activeNav = 'suggest';
+        $title         = 'Suggest a source';
+        $activeNav     = 'suggest';
+        $showWidgets   = false;
+        $showFilterBar = false;
         include DB_ROOT . '/src/View/layout.php';
         include DB_ROOT . '/src/View/suggest/index.php';
         include DB_ROOT . '/src/View/layout_end.php';

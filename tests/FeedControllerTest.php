@@ -52,4 +52,46 @@ final class FeedControllerTest extends TestCase
 
         $this->assertSame('/feed?days=since', $safe);
     }
+
+    public function testMergeWidgetSlotsAppliesValidOverride(): void
+    {
+        $controller = new FeedController();
+        $method = new ReflectionMethod(FeedController::class, 'mergeWidgetSlots');
+        $method->setAccessible(true);
+
+        $defaults = [
+            1 => ['kind' => 'default_ransomlook'],
+            2 => ['kind' => 'default_cves'],
+        ];
+        $overrides = [
+            1 => ['kind' => 'custom', 'title' => 'My Source'],
+        ];
+
+        $merged = $method->invoke($controller, $defaults, $overrides);
+
+        $this->assertCount(2, $merged);
+        $this->assertSame('custom', $merged[0]['kind']);
+        $this->assertSame('default_cves', $merged[1]['kind']);
+    }
+
+    public function testMergeWidgetSlotsIgnoresInvalidSlotOverride(): void
+    {
+        $controller = new FeedController();
+        $method = new ReflectionMethod(FeedController::class, 'mergeWidgetSlots');
+        $method->setAccessible(true);
+
+        $defaults = [
+            1 => ['kind' => 'default_ransomlook'],
+            2 => ['kind' => 'default_cves'],
+        ];
+        $overrides = [
+            3 => ['kind' => 'custom', 'title' => 'Ignored'],
+        ];
+
+        $merged = $method->invoke($controller, $defaults, $overrides);
+
+        $this->assertCount(2, $merged);
+        $this->assertSame('default_ransomlook', $merged[0]['kind']);
+        $this->assertSame('default_cves', $merged[1]['kind']);
+    }
 }

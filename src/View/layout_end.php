@@ -27,6 +27,113 @@ if (!function_exists('cveSeverityFromSummary')) {
 <?php if (($showWidgets ?? true) === true): ?>
 <aside class="widget-rail" aria-label="Widgets">
 
+    <?php if (isset($widgetSlots) && is_array($widgetSlots) && !empty($widgetSlots)): ?>
+    <?php foreach ($widgetSlots as $slot): ?>
+    <?php $kind = (string) ($slot['kind'] ?? 'custom'); ?>
+
+    <?php if ($kind === 'default_ransomlook'): ?>
+    <?php $items = is_array($slot['items'] ?? null) ? $slot['items'] : ($ransomlookItems ?? []); ?>
+    <div class="widget">
+        <div class="widget-header">
+            <h2 class="widget-title">Ransomware Activity</h2>
+            <a href="https://www.ransomlook.io/" target="_blank" rel="noopener noreferrer nofollow"
+                class="widget-attribution">Data: ransomlook.io (CC BY 4.0)</a>
+        </div>
+        <div class="widget-body">
+            <p class="widget-scroll-hint" aria-hidden="true">Scroll for more</p>
+            <?php if (empty($items)): ?>
+            <p class="widget-empty">No recent activity — fetch pending.</p>
+            <p class="widget-empty"><a href="/settings/widgets" class="form-link">Customize widgets</a></p>
+            <?php else: ?>
+            <?php foreach ($items as $ri): ?>
+            <div class="ransom-item">
+                <a href="<?= Html::e($ri['url']) ?>" target="_blank" rel="noopener noreferrer nofollow">
+                    <?= Html::e($ri['title']) ?>
+                </a>
+                <time><?= relativeTime($ri['published_at'] ?? null) ?></time>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php elseif ($kind === 'default_cves'): ?>
+    <?php $items = is_array($slot['items'] ?? null) ? $slot['items'] : ($cveItems ?? []); ?>
+    <div class="widget">
+        <div class="widget-header">
+            <h2 class="widget-title">Recent CVEs</h2>
+            <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener noreferrer nofollow"
+                class="widget-attribution">CISA KEV</a>
+        </div>
+        <div class="widget-body">
+            <p class="widget-scroll-hint" aria-hidden="true">Scroll for more</p>
+            <?php if (empty($items)): ?>
+            <p class="widget-empty">No recent CVEs — fetch pending.</p>
+            <p class="widget-empty"><a href="/settings/widgets" class="form-link">Customize widgets</a></p>
+            <?php else: ?>
+            <?php foreach ($items as $ci): ?>
+            <?php $severity = cveSeverityFromSummary((string) ($ci['summary'] ?? '')); ?>
+            <?php $displaySummary = (string) ($ci['summary'] ?? ''); ?>
+            <?php $displaySummary = preg_replace('/\A\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*(\([^)]*\))?\s*(?:—|-)?\s*/i', '', $displaySummary) ?? $displaySummary; ?>
+            <div class="cve-item cve-item--<?= Html::e($severity) ?>">
+                <div class="cve-headline-row">
+                    <a class="cve-headline" href="<?= Html::e($ci['url']) ?>" target="_blank"
+                        rel="noopener noreferrer nofollow">
+                        <?= Html::e($ci['title']) ?>
+                    </a>
+                    <span
+                        class="cve-severity cve-severity--<?= Html::e($severity) ?>"><?= Html::e(strtoupper($severity === 'unknown' ? 'unscored' : $severity)) ?></span>
+                </div>
+                <?php if (($ci['epss_score'] ?? null) !== null): ?>
+                <?php $epssPercent = round((float) $ci['epss_score'] * 100, 1); ?>
+                <?php $epssLevel = $epssPercent >= 30.0 ? 'high' : ($epssPercent >= 5.0 ? 'medium' : 'low'); ?>
+                <span class="epss-badge epss-badge--<?= Html::e($epssLevel) ?>">EPSS <?= Html::e((string) $epssPercent) ?>%</span>
+                <?php endif; ?>
+                <?php if ($displaySummary !== ''): ?>
+                <p class="cve-summary"><?= Html::e(Html::sanitizeSummary($displaySummary, 180)) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($ci['published_at'])): ?>
+                <time><?= relativeTime($ci['published_at']) ?></time>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php else: ?>
+    <?php $slotTitle = (string) ($slot['title'] ?? 'Source Updates'); ?>
+    <?php $slotAttr = (string) ($slot['attribution'] ?? ''); ?>
+    <?php $items = is_array($slot['items'] ?? null) ? $slot['items'] : []; ?>
+    <div class="widget">
+        <div class="widget-header">
+            <h2 class="widget-title"><?= Html::e($slotTitle) ?></h2>
+            <?php if ($slotAttr !== ''): ?>
+            <span class="widget-attribution"><?= Html::e($slotAttr) ?></span>
+            <?php endif; ?>
+        </div>
+        <div class="widget-body">
+            <p class="widget-scroll-hint" aria-hidden="true">Scroll for more</p>
+            <?php if (empty($items)): ?>
+            <p class="widget-empty">No recent items for this source.</p>
+            <p class="widget-empty"><a href="/settings/widgets" class="form-link">Pick a different source</a></p>
+            <?php else: ?>
+            <?php foreach ($items as $item): ?>
+            <div class="ransom-item">
+                <a href="<?= Html::e($item['url']) ?>" target="_blank" rel="noopener noreferrer nofollow">
+                    <?= Html::e($item['title']) ?>
+                </a>
+                <time><?= relativeTime($item['published_at'] ?? null) ?></time>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php endforeach; ?>
+
+    <?php else: ?>
+
     <div class="widget">
         <div class="widget-header">
             <h2 class="widget-title">Ransomware Activity</h2>
@@ -91,6 +198,7 @@ if (!function_exists('cveSeverityFromSummary')) {
         </div>
     </div>
 
+    <?php endif; ?>
 </aside><!-- .widget-rail -->
 <?php endif; ?>
 

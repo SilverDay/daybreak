@@ -88,6 +88,8 @@ $router->get('/settings/export',          [UserController::class,  'export']);
 // ── Source preferences (auth required) ────────────────────────────────────────
 $router->get('/settings/sources',         [UserController::class,  'showSources']);
 $router->post('/settings/sources',         [UserController::class,  'handleSources']);
+$router->get('/settings/widgets',         [UserController::class,  'showWidgets']);
+$router->post('/settings/widgets',         [UserController::class,  'handleWidgets']);
 
 // ── Watch terms (auth required) ───────────────────────────────────────────────
 $router->get('/settings/watch',           [UserController::class,     'showWatch']);

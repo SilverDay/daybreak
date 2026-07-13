@@ -173,7 +173,7 @@ final class FeedController
             : '/feed?days=' . $windowMode
         ) . '&page=';
 
-        // Widget rail (same as public page, not filtered by user sources).
+        // Default widget rail sources.
         $ransomlookItems = Database::query(
             "SELECT a.title, a.url, a.published_at
              FROM articles a
@@ -183,11 +183,65 @@ final class FeedController
         )->fetchAll();
 
         $cveItems = Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at
+            "SELECT a.title, a.url, a.summary, a.published_at,
+                    e.epss_score, e.percentile
              FROM articles a
              JOIN sources s ON s.id = a.source_id AND s.adapter_type IN ('nvd','cisa_kev')
+             LEFT JOIN cve_epss e ON e.cve_id = a.guid
                ORDER BY a.published_at DESC LIMIT 10"
         )->fetchAll();
+
+        $defaultWidgetSlots = [
+            1 => [
+                'kind'  => 'default_ransomlook',
+                'title' => 'Ransomware Activity',
+                'items' => $ransomlookItems,
+            ],
+            2 => [
+                'kind'  => 'default_cves',
+                'title' => 'Recent CVEs',
+                'items' => $cveItems,
+            ],
+        ];
+
+        $configuredSlotRows = Database::query(
+            "SELECT u.slot, u.source_id,
+                    s.id AS source_exists, s.name AS source_name, s.attribution_text
+             FROM user_widget_sources u
+             LEFT JOIN sources s ON s.id = u.source_id
+               AND s.status IN ('active', 'degraded')
+               AND s.adapter_type IN ('rss_atom', 'json_api', 'cisa_kev')
+             WHERE u.user_id = ? AND u.slot IN (1,2)
+             ORDER BY u.slot ASC",
+            [$userId]
+        )->fetchAll();
+
+        $overrides = [];
+        foreach ($configuredSlotRows as $row) {
+            $slot = (int) ($row['slot'] ?? 0);
+            if ($slot !== 1 && $slot !== 2) {
+                continue;
+            }
+
+            $sourceId = isset($row['source_id']) ? (int) $row['source_id'] : null;
+            if ($sourceId === null || !isset($row['source_exists'])) {
+                continue;
+            }
+
+            $items = Database::query(
+                'SELECT title, url, published_at FROM articles WHERE source_id = ? ORDER BY published_at DESC LIMIT 10',
+                [$sourceId]
+            )->fetchAll();
+
+            $overrides[$slot] = [
+                'kind'        => 'custom',
+                'title'       => (string) ($row['source_name'] ?? 'Source Updates'),
+                'attribution' => (string) ($row['attribution_text'] ?? ''),
+                'items'       => $items,
+            ];
+        }
+
+        $widgetSlots = $this->mergeWidgetSlots($defaultWidgetSlots, $overrides);
 
         // Feed base paths for layout.php filter bar.
         $allFeedUrl    = '/feed';
@@ -395,5 +449,19 @@ final class FeedController
         }
 
         return $path . '?days=' . rawurlencode($days);
+    }
+
+    /** @param array<int, array<string, mixed>> $defaults @param array<int, array<string, mixed>> $overrides */
+    private function mergeWidgetSlots(array $defaults, array $overrides): array
+    {
+        $slots = $defaults;
+        foreach ($overrides as $slot => $payload) {
+            if (($slot === 1 || $slot === 2) && is_array($payload)) {
+                $slots[$slot] = $payload;
+            }
+        }
+
+        ksort($slots);
+        return array_values($slots);
     }
 }

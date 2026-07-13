@@ -274,6 +274,95 @@ final class UserController
         exit;
     }
 
+    public function showWidgets(array $args = []): void
+    {
+        AuthService::requireAuth();
+        $user   = AuthService::currentUser();
+        $userId = (int) $user['id'];
+
+        $eligibleSources = Database::query(
+            "SELECT s.id, s.name, s.attribution_text,
+                    c.name AS category_name, c.sort_order
+             FROM sources s
+             LEFT JOIN source_categories c ON c.id = s.category_id
+             WHERE s.status IN ('active', 'degraded')
+               AND s.adapter_type IN ('rss_atom', 'json_api', 'cisa_kev')
+             ORDER BY c.sort_order, s.name"
+        )->fetchAll();
+
+        $rows = Database::query(
+            'SELECT slot, source_id FROM user_widget_sources WHERE user_id = ? AND slot IN (1,2)',
+            [$userId]
+        )->fetchAll();
+
+        $selectedSlots = [1 => null, 2 => null];
+        foreach ($rows as $row) {
+            $slot = (int) ($row['slot'] ?? 0);
+            if ($slot === 1 || $slot === 2) {
+                $selectedSlots[$slot] = isset($row['source_id']) ? (int) $row['source_id'] : null;
+            }
+        }
+
+        $groupedSources = [];
+        foreach ($eligibleSources as $source) {
+            $categoryName = (string) ($source['category_name'] ?? 'Uncategorized');
+            $groupedSources[$categoryName][] = $source;
+        }
+
+        $title       = 'Widgets';
+        $settingsNav = 'widgets';
+
+        header('Content-Type: text/html; charset=utf-8');
+        include DB_ROOT . '/src/View/settings_layout.php';
+        include DB_ROOT . '/src/View/user/widgets.php';
+        include DB_ROOT . '/src/View/settings_layout_end.php';
+    }
+
+    public function handleWidgets(array $args = []): void
+    {
+        AuthService::requireAuth();
+        Csrf::check();
+
+        $user   = AuthService::currentUser();
+        $userId = (int) $user['id'];
+
+        $slot1 = $this->parseOptionalPositiveInt($_POST['slot_1_source_id'] ?? null);
+        $slot2 = $this->parseOptionalPositiveInt($_POST['slot_2_source_id'] ?? null);
+        if ($slot1 === -1 || $slot2 === -1) {
+            $_SESSION['flash_error'] = 'Invalid widget source selection.';
+            header('Location: /settings/widgets');
+            exit;
+        }
+
+        $eligibleIds = array_map('intval', Database::query(
+            "SELECT id FROM sources
+             WHERE status IN ('active', 'degraded')
+               AND adapter_type IN ('rss_atom', 'json_api', 'cisa_kev')"
+        )->fetchAll(\PDO::FETCH_COLUMN));
+
+        $validationError = $this->validateWidgetSelection($slot1, $slot2, $eligibleIds);
+        if ($validationError !== null) {
+            $_SESSION['flash_error'] = $validationError;
+            header('Location: /settings/widgets');
+            exit;
+        }
+
+        Database::query(
+            'INSERT INTO user_widget_sources (user_id, slot, source_id) VALUES (?, 1, ?)
+             ON DUPLICATE KEY UPDATE source_id = VALUES(source_id), updated_at = NOW()',
+            [$userId, $slot1]
+        );
+        Database::query(
+            'INSERT INTO user_widget_sources (user_id, slot, source_id) VALUES (?, 2, ?)
+             ON DUPLICATE KEY UPDATE source_id = VALUES(source_id), updated_at = NOW()',
+            [$userId, $slot2]
+        );
+
+        $_SESSION['flash'] = 'Widget preferences saved.';
+        header('Location: /settings/widgets');
+        exit;
+    }
+
     public function showWatch(array $args = []): void
     {
         AuthService::requireAuth();
@@ -341,5 +430,45 @@ final class UserController
         header('Content-Disposition: attachment; filename="daybreak-data-export.json"');
         header('Content-Length: ' . strlen($json));
         echo $json;
+    }
+
+    private function parseOptionalPositiveInt(mixed $value): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (!ctype_digit($raw)) {
+            return -1;
+        }
+
+        $id = (int) $raw;
+        if ($id <= 0) {
+            return -1;
+        }
+
+        return $id;
+    }
+
+    private function validateWidgetSelection(?int $slot1, ?int $slot2, array $eligibleIds): ?string
+    {
+        if ($slot1 !== null && $slot2 !== null && $slot1 === $slot2) {
+            return 'Choose different sources for slot 1 and slot 2.';
+        }
+
+        $eligibleSet = array_flip($eligibleIds);
+        if ($slot1 !== null && !isset($eligibleSet[$slot1])) {
+            return 'Slot 1 source is no longer eligible.';
+        }
+        if ($slot2 !== null && !isset($eligibleSet[$slot2])) {
+            return 'Slot 2 source is no longer eligible.';
+        }
+
+        return null;
     }
 }

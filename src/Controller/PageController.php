@@ -57,6 +57,7 @@ final class PageController
 
     public function robots(array $args = []): void
     {
+        $baseUrl = $this->baseUrl();
         header('Content-Type: text/plain; charset=utf-8');
         echo "User-agent: *\n";
         echo "Allow: /\n";
@@ -66,7 +67,7 @@ final class PageController
         echo "Disallow: /password\n";
         echo "Disallow: /search\n";
         echo "Disallow: /suggest\n";
-        echo "Sitemap: /sitemap.xml\n";
+        echo 'Sitemap: ' . $this->absoluteUrl($baseUrl, '/sitemap.xml') . "\n";
     }
 
     public function sitemap(array $args = []): void
@@ -78,7 +79,7 @@ final class PageController
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         echo "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         foreach ($paths as $path) {
-            $loc = $baseUrl !== '' ? $baseUrl . $path : $path;
+            $loc = $this->absoluteUrl($baseUrl, $path);
             echo "  <url><loc>" . Html::e($loc) . "</loc></url>\n";
         }
         echo "</urlset>\n";
@@ -86,24 +87,54 @@ final class PageController
 
     private function baseUrl(): string
     {
-        $configuredRaw = trim((string) (Config::get('APP_URL', '') ?? ''));
-        if ($configuredRaw !== '') {
-            $parsedConfigured = parse_url($configuredRaw);
-            if (
-                is_array($parsedConfigured)
-                && in_array((string) ($parsedConfigured['scheme'] ?? ''), ['http', 'https'], true)
-                && isset($parsedConfigured['host'])
-                && is_string($parsedConfigured['host'])
-                && preg_match('/\A[a-z0-9.-]+\z/i', $parsedConfigured['host']) === 1
-            ) {
-                $base = (string) $parsedConfigured['scheme'] . '://' . (string) $parsedConfigured['host'];
-                if (isset($parsedConfigured['port'])) {
-                    $base .= ':' . (int) $parsedConfigured['port'];
-                }
-                return $base;
+        $candidates = [
+            trim((string) (Config::get('APP_BASE_URL', '') ?? '')),
+            trim((string) (Config::get('APP_URL', '') ?? '')),
+        ];
+
+        foreach ($candidates as $configuredRaw) {
+            if ($configuredRaw === '') {
+                continue;
             }
+
+            $parsedConfigured = parse_url($configuredRaw);
+            if (!is_array($parsedConfigured)) {
+                continue;
+            }
+
+            $scheme = (string) ($parsedConfigured['scheme'] ?? '');
+            $host = (string) ($parsedConfigured['host'] ?? '');
+            if (
+                !in_array($scheme, ['http', 'https'], true)
+                || $host === ''
+                || preg_match('/\A[a-z0-9.-]+\z/i', $host) !== 1
+            ) {
+                continue;
+            }
+
+            $base = $scheme . '://' . $host;
+            if (isset($parsedConfigured['port'])) {
+                $base .= ':' . (int) $parsedConfigured['port'];
+            }
+
+            $path = (string) ($parsedConfigured['path'] ?? '');
+            if ($path !== '' && $path !== '/') {
+                $base .= '/' . trim($path, '/');
+            }
+
+            return rtrim($base, '/');
         }
 
         return '';
+    }
+
+    private function absoluteUrl(string $baseUrl, string $path): string
+    {
+        $normalizedPath = '/' . ltrim($path, '/');
+        if ($baseUrl === '') {
+            return $normalizedPath;
+        }
+
+        return rtrim($baseUrl, '/') . $normalizedPath;
     }
 }
