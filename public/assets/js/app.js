@@ -4,7 +4,7 @@
 (function () {
     // Apply dynamic badge colors via JS (CSP-safe: el.style.setProperty is not
     // blocked by style-src 'self', unlike inline style="" attributes).
-    document.querySelectorAll('[data-badge-color]').forEach(function(el) {
+    document.querySelectorAll('[data-badge-color]').forEach(function (el) {
         el.style.setProperty('--badge-color', el.dataset.badgeColor);
     });
     function cellValue(cell, type) {
@@ -55,7 +55,7 @@
 
         headers.forEach(function (th, i) {
             th.setAttribute('tabindex', '0');
-            th.setAttribute('role', 'button');
+            th.setAttribute('aria-sort', 'none');
 
             function doSort() {
                 var type = th.getAttribute('data-sort');
@@ -66,8 +66,12 @@
                     activeDir = (type === 'num' || type === 'date') ? -1 : 1;
                 }
                 sortTable(table, i, type, activeDir);
-                headers.forEach(function (h) { h.removeAttribute('data-sort-dir'); });
+                headers.forEach(function (h) {
+                    h.removeAttribute('data-sort-dir');
+                    h.setAttribute('aria-sort', 'none');
+                });
                 th.setAttribute('data-sort-dir', activeDir === 1 ? 'asc' : 'desc');
+                th.setAttribute('aria-sort', activeDir === 1 ? 'ascending' : 'descending');
             }
 
             th.addEventListener('click', doSort);
@@ -75,6 +79,10 @@
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doSort(); }
             });
         });
+
+        if (activeCol >= 0 && headers[activeCol]) {
+            headers[activeCol].setAttribute('aria-sort', activeDir === 1 ? 'ascending' : 'descending');
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -90,15 +98,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Sources page: select-all / deselect-all buttons.
-    var selectAll   = document.getElementById('select-all');
+    var selectAll = document.getElementById('select-all');
     var deselectAll = document.getElementById('deselect-all');
     function setAll(checked) {
         document.querySelectorAll('input[name="sources[]"]').forEach(function (cb) {
             cb.checked = checked;
         });
     }
-    if (selectAll)   { selectAll.addEventListener('click',   function () { setAll(true);  }); }
+    if (selectAll) { selectAll.addEventListener('click', function () { setAll(true); }); }
     if (deselectAll) { deselectAll.addEventListener('click', function () { setAll(false); }); }
+
+    // Ensure horizontally scrollable tables can be focused and scrolled via keyboard.
+    document.querySelectorAll('.table-wrap').forEach(function (el) {
+        if (el.scrollWidth > el.clientWidth) {
+            if (!el.hasAttribute('tabindex')) {
+                el.setAttribute('tabindex', '0');
+            }
+            if (!el.hasAttribute('role')) {
+                el.setAttribute('role', 'region');
+            }
+            if (!el.hasAttribute('aria-label')) {
+                el.setAttribute('aria-label', 'Scrollable table');
+            }
+        }
+    });
 
     // CSP-safe confirm dialogs: forms with data-confirm="message" prompt before submit.
     // Replaces inline onsubmit handlers which are blocked by script-src 'self'.
@@ -112,6 +135,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Theme management (toggle button + settings radios).
+    function updateThemeToggleA11y(toggle) {
+        if (!toggle) return;
+        var appliedTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        toggle.setAttribute('aria-pressed', appliedTheme === 'dark' ? 'true' : 'false');
+        toggle.setAttribute('aria-label', appliedTheme === 'dark' ? 'Theme: dark. Activate to switch theme' : 'Theme: light. Activate to switch theme');
+    }
+
     function applyTheme(val) {
         var isDark;
         if (val === 'dark') {
@@ -126,6 +156,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('input[name="theme"]').forEach(function (r) {
             r.checked = (r.value === val);
         });
+        updateThemeToggleA11y(document.getElementById('theme-toggle'));
     }
 
     var themeToggle = document.getElementById('theme-toggle');
@@ -135,6 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
             applyTheme(cur === 'light' ? 'dark' : cur === 'dark' ? 'system' : 'light');
         });
     }
+    updateThemeToggleA11y(themeToggle);
 
     var storedTheme = localStorage.getItem('daybreak-theme') || 'system';
     document.querySelectorAll('input[name="theme"]').forEach(function (r) {
@@ -154,13 +186,13 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: '_csrf=' + encodeURIComponent(csrf) + '&article_id=' + encodeURIComponent(articleId)
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (typeof data.starred !== 'undefined') {
-                btn.classList.toggle('star-btn--active', data.starred);
-                btn.setAttribute('aria-label', data.starred ? 'Unstar article' : 'Star article');
-            }
-        });
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (typeof data.starred !== 'undefined') {
+                    btn.classList.toggle('star-btn--active', data.starred);
+                    btn.setAttribute('aria-label', data.starred ? 'Unstar article' : 'Star article');
+                }
+            });
     });
 
     // Read tracking — fire-and-forget POST when an outbound article link is clicked.

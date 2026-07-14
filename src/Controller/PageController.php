@@ -22,6 +22,18 @@ final class PageController
         include DB_ROOT . '/src/View/layout_end.php';
     }
 
+    public function accessibility(array $args = []): void
+    {
+        $title          = 'Accessibility Statement';
+        $activeNav      = '';
+        $showWidgets    = false;
+        $showFilterBar  = false;
+        $seoDescription = 'Accessibility statement for Daybreak according to EN 301 549 and WCAG 2.1 AA.';
+        include DB_ROOT . '/src/View/layout.php';
+        include DB_ROOT . '/src/View/page/accessibility.php';
+        include DB_ROOT . '/src/View/layout_end.php';
+    }
+
     public function imprint(array $args = []): void
     {
         $title         = 'Imprint';
@@ -73,7 +85,7 @@ final class PageController
     public function sitemap(array $args = []): void
     {
         $baseUrl = $this->baseUrl();
-        $paths = ['/', '/about', '/imprint', '/terms', '/privacy'];
+        $paths = ['/', '/about', '/accessibility', '/imprint', '/terms', '/privacy'];
 
         header('Content-Type: application/xml; charset=utf-8');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";

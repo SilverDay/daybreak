@@ -76,12 +76,20 @@ $seoDescription = (string) ($seoDescription ?? 'Administrative pages for Daybrea
   <meta name="twitter:description" content="<?= Html::e($seoDescription) ?>">
   <meta name="twitter:image" content="<?= Html::e($socialImageUrl) ?>">
   <title><?= Html::e($title ?? 'Admin') ?> · Daybreak</title>
-  <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">(function(){var s=localStorage.getItem('daybreak-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}());</script>
+  <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">
+    (function() {
+      var s = localStorage.getItem('daybreak-theme');
+      var d = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme:dark)').matches);
+      document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    }());
+  </script>
   <link rel="stylesheet" href="/assets/css/app.css">
   <script src="/assets/js/app.js" defer></script>
 </head>
 
 <body class="admin-body">
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <header class="site-header">
     <div class="site-header-inner">
@@ -91,9 +99,21 @@ $seoDescription = (string) ($seoDescription ?? 'Administrative pages for Daybrea
       <nav class="site-nav" aria-label="User navigation">
         <a href="/" class="site-nav-link">View Site</a>
         <a href="/settings/account" class="site-nav-link"><?= Html::e($_currentUser['display_name'] ?? '') ?></a>
-        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme">
-          <svg class="theme-toggle-icon theme-toggle-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          <svg class="theme-toggle-icon theme-toggle-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme" aria-pressed="false">
+          <svg class="theme-toggle-icon theme-toggle-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <svg class="theme-toggle-icon theme-toggle-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
         </button>
         <form method="post" action="/logout" class="site-nav-logout">
           <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
@@ -105,21 +125,21 @@ $seoDescription = (string) ($seoDescription ?? 'Administrative pages for Daybrea
 
   <div class="admin-subnav">
     <div class="admin-subnav-inner">
-      <a href="/admin" class="admin-nav-link<?= $_adminNav === 'dashboard'   ? ' is-active' : '' ?>">Dashboard</a>
-      <a href="/admin/sources" class="admin-nav-link<?= $_adminNav === 'sources'     ? ' is-active' : '' ?>">Sources</a>
-      <a href="/admin/suggestions" class="admin-nav-link<?= $_adminNav === 'suggestions' ? ' is-active' : '' ?>">Suggestions</a>
-      <a href="/admin/users" class="admin-nav-link<?= $_adminNav === 'users'       ? ' is-active' : '' ?>">Users</a>
-      <a href="/admin/categories" class="admin-nav-link<?= $_adminNav === 'categories' ? ' is-active' : '' ?>">Categories</a>
-      <a href="/admin/audit" class="admin-nav-link<?= $_adminNav === 'audit'       ? ' is-active' : '' ?>">Audit Log</a>
+      <a href="/admin" class="admin-nav-link<?= $_adminNav === 'dashboard'   ? ' is-active' : '' ?>" <?= $_adminNav === 'dashboard' ? ' aria-current="page"' : '' ?>>Dashboard</a>
+      <a href="/admin/sources" class="admin-nav-link<?= $_adminNav === 'sources'     ? ' is-active' : '' ?>" <?= $_adminNav === 'sources' ? ' aria-current="page"' : '' ?>>Sources</a>
+      <a href="/admin/suggestions" class="admin-nav-link<?= $_adminNav === 'suggestions' ? ' is-active' : '' ?>" <?= $_adminNav === 'suggestions' ? ' aria-current="page"' : '' ?>>Suggestions</a>
+      <a href="/admin/users" class="admin-nav-link<?= $_adminNav === 'users'       ? ' is-active' : '' ?>" <?= $_adminNav === 'users' ? ' aria-current="page"' : '' ?>>Users</a>
+      <a href="/admin/categories" class="admin-nav-link<?= $_adminNav === 'categories' ? ' is-active' : '' ?>" <?= $_adminNav === 'categories' ? ' aria-current="page"' : '' ?>>Categories</a>
+      <a href="/admin/audit" class="admin-nav-link<?= $_adminNav === 'audit'       ? ' is-active' : '' ?>" <?= $_adminNav === 'audit' ? ' aria-current="page"' : '' ?>>Audit Log</a>
     </div>
   </div>
 
   <?php if ($_flash || $_flashErr): ?>
-    <div class="flash-wrap">
-      <?php if ($_flash): ?><div class="flash flash-success"><?= Html::e($_flash) ?></div><?php endif; ?>
-      <?php if ($_flashErr): ?><div class="flash flash-error"><?= Html::e($_flashErr) ?></div><?php endif; ?>
+    <div class="flash-wrap" aria-live="polite" aria-atomic="true">
+      <?php if ($_flash): ?><div class="flash flash-success" role="status"><?= Html::e($_flash) ?></div><?php endif; ?>
+      <?php if ($_flashErr): ?><div class="flash flash-error" role="alert"><?= Html::e($_flashErr) ?></div><?php endif; ?>
     </div>
   <?php endif; ?>
 
-  <main class="admin-main">
+  <main id="main-content" class="admin-main" tabindex="-1">
     <div class="admin-content">

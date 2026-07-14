@@ -72,11 +72,19 @@ $seoDescription = (string) ($seoDescription ?? 'Authentication pages for Daybrea
   <meta name="twitter:description" content="<?= Html::e($seoDescription) ?>">
   <meta name="twitter:image" content="<?= Html::e($socialImageUrl) ?>">
   <title><?= Html::e($title ?? 'Daybreak') ?> · Daybreak</title>
-  <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">(function(){var s=localStorage.getItem('daybreak-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}());</script>
+  <script nonce="<?= Html::e(\Daybreak\Security\SecurityHeaders::nonce()) ?>">
+    (function() {
+      var s = localStorage.getItem('daybreak-theme');
+      var d = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme:dark)').matches);
+      document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    }());
+  </script>
   <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 
 <body>
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <header class="site-header">
     <div class="site-header-inner">
@@ -86,13 +94,13 @@ $seoDescription = (string) ($seoDescription ?? 'Authentication pages for Daybrea
     </div>
   </header>
 
-  <main class="auth-main">
+  <main id="main-content" class="auth-main" tabindex="-1">
     <div class="auth-card">
       <h1 class="auth-title"><?= Html::e($title ?? '') ?></h1>
 
       <?php if ($_flash): ?>
-        <div class="flash flash-success"><?= Html::e($_flash) ?></div>
+        <div class="flash flash-success" role="status" aria-live="polite" aria-atomic="true"><?= Html::e($_flash) ?></div>
       <?php endif; ?>
       <?php if ($_flashErr): ?>
-        <div class="flash flash-error"><?= Html::e($_flashErr) ?></div>
+        <div class="flash flash-error" role="alert" aria-atomic="true"><?= Html::e($_flashErr) ?></div>
       <?php endif; ?>

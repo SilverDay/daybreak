@@ -45,9 +45,9 @@ final class PageControllerTest extends TestCase
             $this->fail('Failed to evaluate sitemap loc XPath query.');
         }
 
-        $this->assertCount(5, $locNodes);
+        $this->assertCount(6, $locNodes);
 
-        $expectedPaths = ['/', '/about', '/imprint', '/terms', '/privacy'];
+        $expectedPaths = ['/', '/about', '/accessibility', '/imprint', '/terms', '/privacy'];
         foreach ($expectedPaths as $index => $path) {
             $expected = $baseUrl !== ''
                 ? rtrim($baseUrl, '/') . $path
