@@ -421,7 +421,7 @@ final class AdminController
         AuditLog::write('users.view', 'users', '');
 
         $users = Database::query(
-            "SELECT id, email, display_name, role, status, last_login_at, created_at
+            "SELECT id, email, display_name, role, status, last_login_at, last_seen_at, created_at
              FROM users ORDER BY created_at DESC"
         )->fetchAll();
 

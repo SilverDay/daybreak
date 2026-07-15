@@ -19,6 +19,7 @@ $_me = AuthService::currentUser();
         <th>Role</th>
         <th>Status</th>
         <th>Last login</th>
+        <th>Last visit</th>
         <th>Joined</th>
         <th></th>
       </tr>
@@ -31,6 +32,7 @@ $_me = AuthService::currentUser();
         <td><span class="status-pill status-pill--<?= $u['role'] === 'admin' ? 'active' : 'pending' ?>"><?= Html::e($u['role']) ?></span></td>
         <td><span class="status-pill status-pill--<?= $u['status'] === 'active' ? 'active' : 'disabled' ?>"><?= Html::e($u['status']) ?></span></td>
         <td class="text-secondary text-sm"><?= Html::e($u['last_login_at'] ? (new DateTimeImmutable($u['last_login_at']))->format('M j, Y') : '—') ?></td>
+        <td class="text-secondary text-sm"><?= Html::e($u['last_seen_at'] ? (new DateTimeImmutable($u['last_seen_at']))->format('M j, Y') : '—') ?></td>
         <td class="text-secondary text-sm"><?= Html::e((new DateTimeImmutable($u['created_at']))->format('M j, Y')) ?></td>
         <td>
           <?php if ((int) $u['id'] !== (int) $_me['id']): ?>

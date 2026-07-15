@@ -385,6 +385,12 @@ main {
   vertical-align: bottom;
 }
 
+.article-meta .source-badge {
+  background: transparent;
+  border: 1px solid var(--badge-color, #93c5fd);
+  color: var(--color-text);
+}
+
 .source-badge::before {
   content: '';
   width: 0.42rem;
@@ -519,19 +525,19 @@ main {
   align-items: center;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #ffffff;
-  background: #1e293b;
-  border: 1px solid #1e293b;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   padding: 0.12rem 0.35rem;
   white-space: nowrap;
-  transition: color 0.12s;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
 }
 
 .widget-attribution:hover {
-  color: #ffffff;
-  background: #0f172a;
-  border-color: #0f172a;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-border) 28%, transparent);
+  border-color: var(--color-text-secondary);
   text-decoration: none;
 }
 
@@ -693,32 +699,32 @@ main {
 }
 
 .cve-severity--critical {
-  color: #b91c1c;
-  background: #fef2f2;
+  color: var(--color-text);
+  background: transparent;
   border-color: #fecaca;
 }
 
 .cve-severity--high {
-  color: #c2410c;
-  background: #fff7ed;
+  color: var(--color-text);
+  background: transparent;
   border-color: #fed7aa;
 }
 
 .cve-severity--medium {
-  color: #a16207;
-  background: #fefce8;
+  color: var(--color-text);
+  background: transparent;
   border-color: #fde68a;
 }
 
 .cve-severity--low {
-  color: #166534;
-  background: #f0fdf4;
+  color: var(--color-text);
+  background: transparent;
   border-color: #bbf7d0;
 }
 
 .cve-severity--unknown {
-  color: #475569;
-  background: #f8fafc;
+  color: var(--color-text);
+  background: transparent;
   border-color: #cbd5e1;
 }
 
@@ -735,20 +741,20 @@ main {
 }
 
 .epss-badge--low {
-  color: #166534;
-  background: #f0fdf4;
+  color: var(--color-text);
+  background: transparent;
   border-color: #bbf7d0;
 }
 
 .epss-badge--medium {
-  color: #92400e;
-  background: #fffbeb;
+  color: var(--color-text);
+  background: transparent;
   border-color: #fde68a;
 }
 
 .epss-badge--high {
-  color: #991b1b;
-  background: #fef2f2;
+  color: var(--color-text);
+  background: transparent;
   border-color: #fecaca;
 }
 
@@ -2549,15 +2555,15 @@ textarea:focus-visible {
 }
 
 [data-theme="dark"] .widget-attribution {
-  color: #ffffff;
-  background: #334155;
-  border-color: #475569;
+  color: var(--color-text);
+  background: transparent;
+  border-color: var(--color-border-strong);
 }
 
 [data-theme="dark"] .widget-attribution:hover {
-  color: #ffffff;
-  background: #1e293b;
-  border-color: #334155;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-border) 24%, transparent);
+  border-color: var(--color-text-secondary);
 }
 
 [data-theme="dark"] .filter-select {
@@ -2583,50 +2589,50 @@ textarea:focus-visible {
 }
 
 [data-theme="dark"] .cve-severity--critical {
-  color: #fca5a5;
-  background: rgba(220, 38, 38, 0.18);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(220, 38, 38, 0.35);
 }
 
 [data-theme="dark"] .cve-severity--high {
-  color: #fdba74;
-  background: rgba(234, 88, 12, 0.18);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(234, 88, 12, 0.35);
 }
 
 [data-theme="dark"] .cve-severity--medium {
-  color: #fde68a;
-  background: rgba(202, 138, 4, 0.18);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(202, 138, 4, 0.35);
 }
 
 [data-theme="dark"] .cve-severity--low {
-  color: #86efac;
-  background: rgba(22, 163, 74, 0.18);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(22, 163, 74, 0.35);
 }
 
 [data-theme="dark"] .cve-severity--unknown {
-  color: #94a3b8;
-  background: rgba(71, 85, 105, 0.18);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(71, 85, 105, 0.35);
 }
 
 [data-theme="dark"] .epss-badge--low {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(74, 222, 128, 0.25);
 }
 
 [data-theme="dark"] .epss-badge--medium {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.1);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(251, 191, 36, 0.25);
 }
 
 [data-theme="dark"] .epss-badge--high {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
+  color: var(--color-text);
+  background: transparent;
   border-color: rgba(248, 113, 113, 0.25);
 }
 

@@ -33,6 +33,7 @@ final class AuthService
 
     private static ?array $userCache  = null;
     private static bool   $userLoaded = false;
+    private const LAST_SEEN_TOUCH_INTERVAL_MIN = 5;
 
     // ── Current user ───────────────────────────────────────────────────────────
 
@@ -49,6 +50,9 @@ final class AuthService
                     [(int) $uid, 'active']
                 )->fetch();
                 self::$userCache = $row ?: null;
+                if (self::$userCache !== null) {
+                    self::touchLastSeen((int) self::$userCache['id']);
+                }
             }
         }
         return self::$userCache;
@@ -387,6 +391,17 @@ final class AuthService
     public static function updateLastSeen(int $userId): void
     {
         Database::query('UPDATE users SET last_seen_at = NOW() WHERE id = ?', [$userId]);
+    }
+
+    private static function touchLastSeen(int $userId): void
+    {
+        Database::query(
+            'UPDATE users
+             SET last_seen_at = NOW()
+             WHERE id = ?
+               AND (last_seen_at IS NULL OR last_seen_at < DATE_SUB(NOW(), INTERVAL ? MINUTE))',
+            [$userId, self::LAST_SEEN_TOUCH_INTERVAL_MIN]
+        );
     }
 
     public static function exportData(int $userId): array
