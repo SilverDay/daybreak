@@ -205,6 +205,7 @@ $ogType = (string) ($ogType ?? 'website');
             <button type="submit" class="site-nav-btn">Sign out</button>
           </form>
         <?php else: ?>
+          <a href="/about" class="site-nav-link<?= ($activeNav ?? '') === 'about' ? ' site-nav-link--active' : '' ?>" <?= ($activeNav ?? '') === 'about' ? ' aria-current="page"' : '' ?>>About</a>
           <a href="/sources" class="site-nav-link<?= ($activeNav ?? '') === 'sources' ? ' site-nav-link--active' : '' ?>">Sources</a>
           <a href="/search" class="site-nav-link<?= ($activeNav ?? '') === 'search' ? ' site-nav-link--active' : '' ?>">Search</a>
           <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch colour theme" aria-pressed="false">
