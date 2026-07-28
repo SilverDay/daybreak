@@ -82,3 +82,89 @@ Raw scanner output was produced during this audit run at:
 - /tmp/daybreak-pa11y-local-final.txt
 
 Note: The temporary path may not persist across environments; keep this report under docs for durable tracking.
+
+## Follow-up: 2026-07-28
+
+Re-ran the same Pa11y/axe scan against production to check the status of the
+"Highest-Priority Remaining Items" above.
+
+### Regression found and fixed
+
+`/sources` was reporting new `color-contrast` errors (axe `needsFurtherReview: false`,
+i.e. confirmed, not ambiguous) on `.freshness-badge--stale` and `.freshness-badge--degraded`
+(`#b45309` text on `#ffedd5` background, ~4.38:1 — below the 4.5:1 AA threshold for this
+text size). This widget/feature was introduced after the 2026-07-14 baseline and had not
+been scanned before. The identical color pair was also found in
+`.status-pill--degraded` (admin sources table), evidently missed when the sibling
+`.status-pill--pending` was already correctly set to `#92400e`.
+
+Fix: changed all three rules to `color: #92400e` (Tailwind amber-800), giving ~6.19:1
+against `#ffedd5`. Confirmed via re-scan: `/sources` error count dropped from
+2 (stale x2 at time of this run) + 1 select to just the 1 select error.
+
+Files: `public/assets/css/app.css` (`.freshness-badge--stale`, `.freshness-badge--degraded`,
+`.status-pill--degraded`).
+
+### Native select controls — resolved via manual verification
+
+Per the recommendation above, computed actual rendered contrast for `.filter-select` /
+`#sources-category` / `#search-days` / `#search-category`:
+
+- Text `#0f172a` on background `#ffffff`: **17.85:1**
+- Border `#334155` on background `#ffffff`: **10.36:1**
+
+Both far exceed WCAG 1.4.3 (4.5:1 text) and 1.4.11 (3:1 non-text UI components). There is
+no contrast headroom left to add via CSS. The persistent axe/Pa11y flag
+(`needsFurtherReview: true` on every run, including this one) is a known limitation with
+color-contrast measurement on native `<select>` elements, not a real defect. Treating this
+as resolved; no further select-replacement work is warranted based on contrast alone.
+
+### Other pages
+
+`/`, `/about`, `/imprint`, `/terms`, `/privacy` — no regressions (0 errors except a
+`needsFurtherReview: true` flag on the homepage `.widget-attribution` link, same
+false-positive category as the selects: computed contrast `#0f172a` on `#ffffff` is
+~17.85:1).
+
+### Account-gated pages — scanned for the first time, one regression found and fixed
+
+The 2026-07-14 baseline only covered public routes. To close that gap, a temporary,
+clearly-labeled test account (`accessibility-audit-test@daybreak.silverday.de`) was
+created directly via `AuthService`, activated by setting `status='active'` directly
+(bypassing the real email-verification round-trip), and seeded with one starred article
+and one watch term so populated (not just empty-state) markup would be scanned. Pa11y/axe
+was driven through the real `/login` form (via Puppeteer actions: fill `#email`/`#password`,
+submit, wait for redirect to `/feed`) so the same session cookie carried into each
+subsequent scan.
+
+Scanned: `/feed`, `/starred`, `/settings/account` (general settings — the route the
+`showAccount()` controller method actually renders), `/settings/security`,
+`/settings/sources`, `/settings/widgets`, `/settings/watch`, `/settings/webhooks`.
+(`/settings/export` was not scanned — it returns a JSON file download, not HTML.)
+
+Found: `link-in-text-block` (WCAG 1.4.1, `needsFurtherReview: false` — confirmed, not
+ambiguous) on `/settings/account` — the inline "Kioju" link in
+`src/View/user/general.php:57` relied on color alone to be distinguished from the
+surrounding paragraph text.
+
+Fix: added `.form-hint a { text-decoration: underline; }` to `public/assets/css/app.css`
+(scoped — `.form-hint` has no other inline-text anchors anywhere in the codebase, so this
+doesn't affect the standalone-URL `.text-link` anchors used elsewhere). Re-scan of
+`/settings/account` after the fix: **No issues found.**
+
+### Legal scope correction: enforcement procedure
+
+The statement's "Enforcement procedure" section previously named a generic "competent
+accessibility enforcement body in Germany" — boilerplate carried over from the
+public-sector BITV 2.0 template. Daybreak is a free, non-commercial personal project:
+it is not a public-sector body (so BITV 2.0 / the EU Web Accessibility Directive don't
+bind it), and it is not an obviously-covered consumer service under the BFSG (Germany's
+EAA transposition), which in any case exempts microenterprises. There is therefore no
+statutory Durchsetzungsstelle with jurisdiction over this site. Reworded "Conformance
+target" and "Enforcement procedure" in `src/View/page/accessibility.php` to state the
+WCAG/EN 301 549 target is adopted voluntarily and that no formal escalation body exists
+beyond direct contact. (Not a certified legal opinion — flagged for the site owner's own
+judgment given the specific facts.)
+
+All other gated pages scanned clean on first pass. The test account and its seeded rows
+(`user_watch_terms`, `user_starred_articles`) were deleted after the scan.
