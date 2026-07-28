@@ -96,6 +96,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (sel) {
         sel.addEventListener('change', function () { this.form.submit(); });
     }
+    var langSel = document.getElementById('window-lang');
+    if (langSel) {
+        langSel.addEventListener('change', function () { this.form.submit(); });
+    }
 
     // Sources page: select-all / deselect-all buttons.
     var selectAll = document.getElementById('select-all');

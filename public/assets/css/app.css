@@ -9,7 +9,7 @@
   /* Text */
   --color-text: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
+  --color-text-muted: #5a6b80;
 
   /* Accent */
   --color-accent: #1e293b;
@@ -60,7 +60,7 @@
   --color-surface: #162032;
   --color-text: #e2e8f0;
   --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
+  --color-text-muted: #8ba0b8;
   --color-accent: #e2e8f0;
   --color-accent-light: #60a5fa;
   --color-accent-dark: #f1f5f9;
@@ -2062,9 +2062,17 @@ code.audit-action {
 }
 
 .search-input:focus {
-  outline: none;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
   border-color: var(--color-accent-light);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
+
+.feed-page-title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  line-height: 1.25;
+  color: var(--color-text);
 }
 
 .search-filters {

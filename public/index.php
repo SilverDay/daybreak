@@ -142,6 +142,11 @@ $router->get('/sitemap.xml', [PageController::class, 'sitemap']);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$isHead = $method === 'HEAD';
+if ($isHead) {
+    $method = 'GET';
+    ob_start();
+}
 
 try {
     $router->dispatch($method, $path);
@@ -160,4 +165,8 @@ try {
     } else {
         echo 'Request failed.';
     }
+}
+
+if ($isHead) {
+    ob_end_clean();
 }

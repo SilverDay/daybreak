@@ -105,7 +105,7 @@ final class FeedController
 
         $articles = DedupService::group(Database::query(
             "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
-                    s.name AS source_name, s.attribution_text,
+                    s.name AS source_name, s.attribution_text, s.language AS source_language,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
              JOIN sources s ON s.id = a.source_id
@@ -131,11 +131,13 @@ final class FeedController
         $watchTerms = array_column($rawTerms, 'term');
 
         $starredIds = array_flip(array_map('intval', Database::query(
-            'SELECT article_id FROM user_starred_articles WHERE user_id = ?', [$userId]
+            'SELECT article_id FROM user_starred_articles WHERE user_id = ?',
+            [$userId]
         )->fetchAll(\PDO::FETCH_COLUMN)));
 
         $readIds = array_flip(array_map('intval', Database::query(
-            'SELECT article_id FROM user_article_reads WHERE user_id = ?', [$userId]
+            'SELECT article_id FROM user_article_reads WHERE user_id = ?',
+            [$userId]
         )->fetchAll(\PDO::FETCH_COLUMN)));
 
         $alertArticles = [];

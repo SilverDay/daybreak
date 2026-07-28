@@ -66,6 +66,8 @@ if ($_flashErr) {
 }
 
 $_cat     = $activeCategory ?? null;
+$_lang    = (string) ($activeLanguage ?? '');
+$_langOptions = (array) ($availableLanguages ?? []);
 // feedBase vars: controllers set these for personalised feed; public page leaves them unset.
 $_base    = $allFeedUrl  ?? '/';
 $_catBase = $catFeedBase ?? '/category/';
@@ -78,6 +80,7 @@ $_filterAction = $_cat !== null
 $_currentUser = AuthService::currentUser();
 $_showWidgets = (bool) ($showWidgets ?? false);
 $_showFilterBar = (bool) ($showFilterBar ?? true);
+$_langQuery = $_lang !== '' ? '&lang=' . rawurlencode($_lang) : '';
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $canonicalPath = (string) ($canonicalPath ?? $requestPath);
@@ -232,10 +235,10 @@ $ogType = (string) ($ogType ?? 'website');
       <div class="filter-bar-inner">
         <div class="feed-controls">
           <div class="feed-controls-chips">
-            <a href="<?= Html::e($_base) ?>?days=<?= Html::e((string) $_winMode) ?>"
+            <a href="<?= Html::e($_base) ?>?days=<?= Html::e((string) $_winMode) ?><?= Html::e($_langQuery) ?>"
               class="cat-chip<?= $_cat === null ? ' is-active' : '' ?>" <?= $_cat === null ? ' aria-current="page"' : '' ?>>All</a>
             <?php foreach ($categories ?? [] as $cat): ?>
-              <a href="<?= Html::e($_catBase . $cat['slug']) ?>?days=<?= Html::e((string) $_winMode) ?>"
+              <a href="<?= Html::e($_catBase . $cat['slug']) ?>?days=<?= Html::e((string) $_winMode) ?><?= Html::e($_langQuery) ?>"
                 class="cat-chip<?= $_cat === $cat['slug'] ? ' is-active' : '' ?>" <?= $_cat === $cat['slug'] ? ' aria-current="page"' : '' ?>><?= Html::e($cat['name']) ?></a>
             <?php endforeach; ?>
           </div>
@@ -247,6 +250,16 @@ $ogType = (string) ($ogType ?? 'website');
                 <option value="<?= Html::e((string) $val) ?>" <?= (string) $_winMode === (string) $val ? ' selected' : '' ?>><?= Html::e($label) ?></option>
               <?php endforeach; ?>
             </select>
+            <?php if (!empty($_langOptions)): ?>
+              <label for="window-lang" class="sr-only">Language</label>
+              <span class="window-label" aria-hidden="true">Language</span>
+              <select id="window-lang" name="lang" class="window-select">
+                <option value="">All</option>
+                <?php foreach ($_langOptions as $lang): ?>
+                  <option value="<?= Html::e((string) $lang) ?>" <?= $_lang === (string) $lang ? ' selected' : '' ?>><?= Html::e(strtoupper((string) $lang)) ?></option>
+                <?php endforeach; ?>
+              </select>
+            <?php endif; ?>
           </form>
         </div>
       </div>

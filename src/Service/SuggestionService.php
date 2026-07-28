@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Daybreak\Service;
@@ -33,7 +34,7 @@ final class SuggestionService
                 $xmlBody = (string) preg_replace('/<!DOCTYPE\b[^[>]*(?:\[[^\]]*])?[^>]*>/is', '', $body);
                 libxml_set_external_entity_loader(static fn() => null);
                 libxml_use_internal_errors(true);
-                $xml = simplexml_load_string($xmlBody);
+                $xml = simplexml_load_string($xmlBody, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
                 libxml_clear_errors();
                 if ($xml !== false) {
                     return ['adapter_type' => 'rss_atom', 'feed_url' => $url];

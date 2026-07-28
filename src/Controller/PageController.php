@@ -73,12 +73,7 @@ final class PageController
         header('Content-Type: text/plain; charset=utf-8');
         echo "User-agent: *\n";
         echo "Allow: /\n";
-        echo "Disallow: /admin\n";
         echo "Disallow: /feed\n";
-        echo "Disallow: /settings\n";
-        echo "Disallow: /password\n";
-        echo "Disallow: /search\n";
-        echo "Disallow: /suggest\n";
         echo 'Sitemap: ' . $this->absoluteUrl($baseUrl, '/sitemap.xml') . "\n";
     }
 

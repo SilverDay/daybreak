@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -11,6 +12,8 @@ declare(strict_types=1);
  *   PRUNE_ARTICLES_DAYS   — articles older than N days are deleted (default: 90)
  *   PRUNE_FETCHLOG_DAYS   — fetch_log rows older than N days (default: 30)
  *   PRUNE_ATTEMPTS_DAYS   — login_attempts rows older than N days (default: 30)
+ *   PRUNE_AUDIT_DAYS      — audit_log rows older than N days (default: 365)
+ *   PRUNE_WEBHOOK_DAYS    — webhook_log rows older than N days (default: 90)
  */
 
 define('DB_ROOT', dirname(__DIR__));
@@ -22,6 +25,8 @@ use Daybreak\Database;
 $articleDays  = max(1, (int) Config::get('PRUNE_ARTICLES_DAYS',  '90'));
 $fetchLogDays = max(1, (int) Config::get('PRUNE_FETCHLOG_DAYS',  '30'));
 $attemptDays  = max(1, (int) Config::get('PRUNE_ATTEMPTS_DAYS',  '30'));
+$auditDays    = max(1, (int) Config::get('PRUNE_AUDIT_DAYS',     '365'));
+$webhookDays  = max(1, (int) Config::get('PRUNE_WEBHOOK_DAYS',   '90'));
 
 function pruneTable(string $table, string $col, int $days): int
 {
@@ -38,7 +43,9 @@ $rows = [
     'articles'       => pruneTable('articles',       'published_at', $articleDays),
     'fetch_log'      => pruneTable('fetch_log',       'created_at',   $fetchLogDays),
     'login_attempts' => pruneTable('login_attempts',  'created_at',   $attemptDays),
-    'sessions'       => pruneTable('sessions',        'last_activity',$attemptDays),
+    'sessions'       => pruneTable('sessions',        'last_activity', $attemptDays),
+    'audit_log'      => pruneTable('audit_log',       'created_at',   $auditDays),
+    'webhook_log'    => pruneTable('webhook_log',     'created_at',   $webhookDays),
 ];
 
 // Prune stale pending users with expired verification tokens.

@@ -180,7 +180,7 @@ final class AuthController
 
     private function renderAuth(string $view, string $title, array $vars = []): void
     {
-        extract($vars);
+        extract($vars, EXTR_SKIP);
         header('Content-Type: text/html; charset=utf-8');
         include DB_ROOT . '/src/View/auth_layout.php';
         include DB_ROOT . '/src/View/' . $view;

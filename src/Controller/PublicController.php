@@ -29,6 +29,25 @@ final class PublicController
 
         $windowDays     = max(1, min(30, (int) ($_GET['days'] ?? 1)));
         $activeCategory = isset($args['slug']) && $args['slug'] !== '' ? $args['slug'] : null;
+        $page           = max(1, (int) ($_GET['page'] ?? 1));
+        $limit          = 60;
+
+        $languageRows = Database::query(
+            "SELECT DISTINCT language
+             FROM sources
+             WHERE status IN ('active', 'degraded')
+               AND adapter_type IN ('rss_atom', 'json_api')
+               AND language IS NOT NULL
+               AND language <> ''
+             ORDER BY language ASC"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $availableLanguages = array_values(array_filter(
+            array_map(static fn($lang) => mb_strtolower((string) $lang), $languageRows),
+            static fn($lang) => preg_match('/^[a-z]{2}$/', $lang) === 1
+        ));
+
+        $requestedLanguage = isset($_GET['lang']) ? mb_strtolower(trim((string) $_GET['lang'])) : '';
+        $activeLanguage = in_array($requestedLanguage, $availableLanguages, true) ? $requestedLanguage : '';
 
         // Categories for the filter bar.
         $categories = Database::query(
@@ -59,11 +78,38 @@ final class PublicController
             $catWhere = 'AND c.slug = ?';
             $params[] = $activeCategory;
         }
+        $langWhere = '';
+        if ($activeLanguage !== '') {
+            $langWhere = 'AND s.language = ?';
+            $params[] = $activeLanguage;
+        }
+
+        $countParams = $params;
+        $total = (int) Database::query(
+            "SELECT COUNT(*)
+             FROM articles a
+             JOIN sources s ON s.id = a.source_id
+                 AND s.status IN ('active', 'degraded')
+                 AND s.adapter_type IN ('rss_atom', 'json_api')
+             LEFT JOIN source_categories c ON c.id = s.category_id
+             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+             {$catWhere}
+             {$langWhere}",
+            $countParams
+        )->fetchColumn();
+
+        $totalPages = max(1, (int) ceil($total / $limit));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $limit;
+
+        $queryParams = $params;
+        $queryParams[] = $limit;
+        $queryParams[] = $offset;
 
         $articles = DedupService::group(Database::query(
             "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text, s.status AS source_status,
-                    s.last_recovered_at,
+                    s.last_recovered_at, s.language AS source_language,
                     c.name AS category, c.slug AS cat_slug, c.color
              FROM articles a
              JOIN sources s ON s.id = a.source_id
@@ -72,10 +118,19 @@ final class PublicController
              LEFT JOIN source_categories c ON c.id = s.category_id
              WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
              {$catWhere}
+             {$langWhere}
              ORDER BY a.published_at DESC
-             LIMIT 60",
-            $params
+             LIMIT ? OFFSET ?",
+            $queryParams
         )->fetchAll());
+
+        $paginationPath = $activeCategory !== null
+            ? $catFeedBase . rawurlencode($activeCategory)
+            : $allFeedUrl;
+        $paginationBase = $paginationPath
+            . '?days=' . $windowDays
+            . ($activeLanguage !== '' ? '&lang=' . rawurlencode($activeLanguage) : '')
+            . '&page=';
 
         // Ransomlook widget: respect the same time window as the main feed.
         $ransomlookItems = Database::query(
@@ -118,7 +173,8 @@ final class PublicController
             $canBookmarkToKioju = KiojuService::hasApiKey($userId);
 
             $readIds = array_flip(array_map('intval', Database::query(
-                'SELECT article_id FROM user_article_reads WHERE user_id = ?', [$userId]
+                'SELECT article_id FROM user_article_reads WHERE user_id = ?',
+                [$userId]
             )->fetchAll(\PDO::FETCH_COLUMN)));
             foreach ($articles as &$a) {
                 $a['read'] = isset($readIds[(int) ($a['id'] ?? 0)]);

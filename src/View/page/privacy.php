@@ -58,7 +58,7 @@ declare(strict_types=1); ?>
                     <td>Hashed IP address (SHA-256 + key)</td>
                     <td>Login throttling, audit log</td>
                     <td>Art. 6(1)(f) — legitimate interest (security)</td>
-                    <td>30 days (login attempts); audit log: 90 days</td>
+                    <td>30 days (login attempts); audit log: 12 months</td>
                 </tr>
                 <tr>
                     <td>Session data</td>

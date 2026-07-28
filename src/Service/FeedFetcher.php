@@ -42,7 +42,7 @@ final class FeedFetcher implements FetchClient
     {
         $redirects = 0;
         while (true) {
-            SsrfGuard::assertSafe($url);
+            $pin = SsrfGuard::assertSafe($url);
 
             $ch = curl_init($url);
             $headers = $extraHeaders !== []
@@ -55,7 +55,7 @@ final class FeedFetcher implements FetchClient
                 $headers[] = 'If-Modified-Since: ' . $lastModified;
             }
 
-            curl_setopt_array($ch, [
+            $options = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HEADER         => true,
                 CURLOPT_FOLLOWLOCATION => false,            // we follow manually to re-check SSRF
@@ -66,13 +66,18 @@ final class FeedFetcher implements FetchClient
                 CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
                 CURLOPT_BUFFERSIZE     => 16384,
                 CURLOPT_NOPROGRESS     => false,
-                // OpenSSL 1.1.1f (Ubuntu 20.04) hangs on TLS 1.3 HelloRetryRequest from
-                // Cloudflare-fronted hosts (e.g. NVD). TLS 1.2 is secure and universally supported.
-                CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2 | CURL_SSLVERSION_MAX_TLSv1_2,
+                CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
                 CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                     return $dlNow > self::MAX_BYTES ? 1 : 0; // abort oversized responses
                 },
-            ]);
+            ];
+            $resolveEntry = $this->curlResolveEntry($pin);
+            if ($resolveEntry !== null) {
+                $options[CURLOPT_RESOLVE] = $resolveEntry;
+            }
+            curl_setopt_array($ch, $options);
 
             $raw    = curl_exec($ch);
             $errno  = curl_errno($ch);
@@ -118,7 +123,7 @@ final class FeedFetcher implements FetchClient
      */
     public function postForm(string $url, array $data, array $extraHeaders = []): array
     {
-        SsrfGuard::assertSafe($url);
+        $pin = SsrfGuard::assertSafe($url);
 
         $ch = curl_init($url);
         $headers = array_merge([
@@ -126,7 +131,7 @@ final class FeedFetcher implements FetchClient
             'Content-Type: application/x-www-form-urlencoded',
         ], $extraHeaders);
 
-        curl_setopt_array($ch, [
+        $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER         => true,
             CURLOPT_FOLLOWLOCATION => false,
@@ -139,10 +144,17 @@ final class FeedFetcher implements FetchClient
             CURLOPT_NOPROGRESS     => false,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($data),
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                 return $dlNow > self::MAX_BYTES ? 1 : 0;
             },
-        ]);
+        ];
+        $resolveEntry = $this->curlResolveEntry($pin);
+        if ($resolveEntry !== null) {
+            $options[CURLOPT_RESOLVE] = $resolveEntry;
+        }
+        curl_setopt_array($ch, $options);
 
         $raw    = curl_exec($ch);
         $errno  = curl_errno($ch);
@@ -171,7 +183,7 @@ final class FeedFetcher implements FetchClient
      */
     public function postJson(string $url, string $jsonBody, array $extraHeaders = []): array
     {
-        SsrfGuard::assertSafe($url);
+        $pin = SsrfGuard::assertSafe($url);
 
         $ch = curl_init($url);
         $headers = array_merge([
@@ -179,7 +191,7 @@ final class FeedFetcher implements FetchClient
             'Content-Type: application/json',
         ], $extraHeaders);
 
-        curl_setopt_array($ch, [
+        $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER         => true,
             CURLOPT_FOLLOWLOCATION => false,
@@ -191,10 +203,17 @@ final class FeedFetcher implements FetchClient
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $jsonBody,
             CURLOPT_NOPROGRESS     => false,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                 return $dlNow > self::MAX_BYTES ? 1 : 0;
             },
-        ]);
+        ];
+        $resolveEntry = $this->curlResolveEntry($pin);
+        if ($resolveEntry !== null) {
+            $options[CURLOPT_RESOLVE] = $resolveEntry;
+        }
+        curl_setopt_array($ch, $options);
 
         $raw    = curl_exec($ch);
         $errno  = curl_errno($ch);
@@ -228,10 +247,10 @@ final class FeedFetcher implements FetchClient
         $finalUrl  = $url;
 
         while (true) {
-            SsrfGuard::assertSafe($url);
+            $pin = SsrfGuard::assertSafe($url);
 
             $ch = curl_init($url);
-            curl_setopt_array($ch, [
+            $options = [
                 CURLOPT_RETURNTRANSFER   => true,
                 CURLOPT_HEADER           => true,
                 CURLOPT_FOLLOWLOCATION   => false,
@@ -242,11 +261,18 @@ final class FeedFetcher implements FetchClient
                 CURLOPT_PROTOCOLS        => CURLPROTO_HTTP | CURLPROTO_HTTPS,
                 CURLOPT_BUFFERSIZE       => 16384,
                 CURLOPT_NOPROGRESS       => false,
-                CURLOPT_SSLVERSION       => CURL_SSLVERSION_TLSv1_2 | CURL_SSLVERSION_MAX_TLSv1_2,
+                CURLOPT_SSLVERSION       => CURL_SSLVERSION_TLSv1_2,
+                CURLOPT_SSL_VERIFYPEER   => true,
+                CURLOPT_SSL_VERIFYHOST   => 2,
                 CURLOPT_PROGRESSFUNCTION => static function ($_ch, $_dlTotal, $dlNow) {
                     return $dlNow > self::MAX_BYTES ? 1 : 0;
                 },
-            ]);
+            ];
+            $resolveEntry = $this->curlResolveEntry($pin);
+            if ($resolveEntry !== null) {
+                $options[CURLOPT_RESOLVE] = $resolveEntry;
+            }
+            curl_setopt_array($ch, $options);
 
             $raw    = curl_exec($ch);
             $errno  = curl_errno($ch);
@@ -287,6 +313,19 @@ final class FeedFetcher implements FetchClient
                 'redirect_count' => $redirects,
             ];
         }
+    }
+
+    /**
+     * @param array{host:string,ip:string,port:int} $pin
+     * @return list<string>|null
+     */
+    private function curlResolveEntry(array $pin): ?array
+    {
+        if (filter_var($pin['host'], FILTER_VALIDATE_IP)) {
+            return null;
+        }
+
+        return [sprintf('%s:%d:%s', $pin['host'], $pin['port'], $pin['ip'])];
     }
 
     private function resolveRedirect(string $base, string $location): string

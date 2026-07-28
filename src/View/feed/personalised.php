@@ -69,7 +69,8 @@ if ($alertArticles !== []): ?>
 <?php else: ?>
   <?php foreach ($articles as $a): ?>
     <article class="article-card<?= ($a['watch_match'] ?? false) ? ' article-card--highlight' : '' ?><?= ($a['read'] ?? false) ? ' article-card--read' : '' ?>"
-             data-article-id="<?= (int) ($a['id'] ?? 0) ?>">
+      data-article-id="<?= (int) ($a['id'] ?? 0) ?>"
+      <?= !empty($a['source_language']) ? 'lang="' . Html::e((string) $a['source_language']) . '"' : '' ?>>
       <div class="article-meta">
         <span class="source-badge" data-badge-color="<?= Html::e($a['color'] ?? '#909090') ?>">
           <?= Html::e($a['source_name']) ?>
@@ -87,11 +88,11 @@ if ($alertArticles !== []): ?>
           </form>
         <?php endif; ?>
         <button type="button"
-            class="star-btn<?= ($a['starred'] ?? false) ? ' star-btn--active' : '' ?>"
-            data-article-id="<?= (int) ($a['id'] ?? 0) ?>"
-            aria-label="<?= ($a['starred'] ?? false) ? 'Unstar article' : 'Star article' ?>">
+          class="star-btn<?= ($a['starred'] ?? false) ? ' star-btn--active' : '' ?>"
+          data-article-id="<?= (int) ($a['id'] ?? 0) ?>"
+          aria-label="<?= ($a['starred'] ?? false) ? 'Unstar article' : 'Star article' ?>">
           <svg class="star-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
           </svg>
         </button>
         <?php if (!empty($a['published_at'])): ?>

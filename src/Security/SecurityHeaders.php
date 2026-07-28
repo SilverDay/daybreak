@@ -22,17 +22,19 @@ final class SecurityHeaders
 
         header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; "
             . "style-src 'self'; script-src 'self' 'nonce-" . self::$nonce . "'; object-src 'none'; "
-            . "base-uri 'self'; frame-ancestors 'none'");
+            . "base-uri 'self'; frame-ancestors 'none'; form-action 'self'; frame-src 'none'; upgrade-insecure-requests");
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: DENY');
+        header('Cross-Origin-Opener-Policy: same-origin');
+        header('Cross-Origin-Resource-Policy: same-origin');
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
         if (self::shouldSendNoIndexHeader($path)) {
             header('X-Robots-Tag: noindex, nofollow, noarchive');
         }
         // HSTS: 1 year, apply to subdomains. Only effective over HTTPS.
         if (($_SERVER['HTTPS'] ?? '') === 'on') {
-            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
         }
     }
 
