@@ -9,10 +9,12 @@ use Daybreak\Security\Csrf;
 /** @var array $categories     rows of {slug, name} */
 /** @var array $activeSources  rows of {slug, name} — active/degraded sources */
 /** @var array $recentLog      recent webhook_log rows */
+/** @var int   $editingId      webhook id currently being edited, or 0 */
 $webhooks      = $webhooks      ?? [];
 $categories    = $categories    ?? [];
 $activeSources = $activeSources ?? [];
 $recentLog     = $recentLog     ?? [];
+$editingId     = $editingId     ?? 0;
 
 $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'teams' => 'Microsoft Teams', 'generic' => 'Generic JSON'];
 $formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264a7'];
@@ -30,18 +32,24 @@ $formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264
     <?php if ($webhooks !== []): ?>
       <ul class="watch-term-list u-mb-15">
         <?php foreach ($webhooks as $wh):
-          $filter  = json_decode($wh['filter_json'] ?? '{}', true) ?? [];
-          $terms   = implode(', ', (array) ($filter['terms']      ?? []));
-          $cats    = implode(', ', (array) ($filter['categories'] ?? []));
-          $srcs    = implode(', ', (array) ($filter['sources']    ?? []));
-          $active  = (bool) $wh['active'];
-          $fmtLabel = $formatLabels[$wh['format']] ?? Html::e($wh['format']);
+          $filter   = json_decode($wh['filter_json'] ?? '{}', true) ?? [];
+          $terms    = implode(', ', (array) ($filter['terms']      ?? []));
+          $cats     = implode(', ', (array) ($filter['categories'] ?? []));
+          $srcs     = implode(', ', (array) ($filter['sources']    ?? []));
+          $active   = (bool) $wh['active'];
+          $fmtLabel = $formatLabels[$wh['format']] ?? $wh['format'];
+          $isEditing = ($editingId === (int) $wh['id']);
         ?>
           <li class="watch-term-item webhook-item">
             <div class="webhook-item-header">
               <strong class="webhook-item-name"><?= Html::e($wh['name']) ?></strong>
               <span class="source-badge" data-badge-color="<?= Html::e($formatColors[$wh['format']] ?? '#334155') ?>"><?= Html::e($fmtLabel) ?></span>
               <?php if (!$active): ?><span class="source-badge" data-badge-color="#94a3b8">Paused</span><?php endif; ?>
+              <?php if ($isEditing): ?>
+                <a href="/settings/webhooks" class="btn btn-secondary btn-sm">Cancel</a>
+              <?php else: ?>
+                <a href="/settings/webhooks?edit=<?= (int) $wh['id'] ?>" class="btn btn-secondary btn-sm">Edit</a>
+              <?php endif; ?>
               <form method="post" action="/settings/webhooks/<?= (int) $wh['id'] ?>">
                 <input type="hidden" name="_csrf"   value="<?= Html::e(Csrf::token()) ?>">
                 <input type="hidden" name="action"  value="toggle">
@@ -65,6 +73,81 @@ $formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264
             <?php else: ?>
               <div class="form-hint webhook-item-detail">No filter &mdash; receives all new articles</div>
             <?php endif; ?>
+            <?php if ($isEditing):
+              $editFilterCats = array_flip((array) ($filter['categories'] ?? []));
+              $editFilterSrcs = array_flip((array) ($filter['sources']    ?? []));
+              $editTerms      = implode(', ', (array) ($filter['terms']   ?? []));
+            ?>
+              <form method="post" action="/settings/webhooks/<?= (int) $wh['id'] ?>" class="webhook-edit-form">
+                <input type="hidden" name="_csrf"  value="<?= Html::e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="edit">
+
+                <div class="form-group">
+                  <label class="form-label" for="wh_edit_name">Name</label>
+                  <input id="wh_edit_name" class="form-input" type="text"
+                    name="name" maxlength="120" required autocomplete="off"
+                    value="<?= Html::e($wh['name']) ?>">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="wh_edit_url">Webhook URL</label>
+                  <input id="wh_edit_url" class="form-input" type="url"
+                    name="url" required autocomplete="off"
+                    value="<?= Html::e($wh['url']) ?>">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="wh_edit_format">Payload format</label>
+                  <select id="wh_edit_format" class="form-input" name="format">
+                    <?php foreach ($formatLabels as $val => $label): ?>
+                      <option value="<?= Html::e($val) ?>"<?= $wh['format'] === $val ? ' selected' : '' ?>><?= Html::e($label) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="wh_edit_terms">Filter: watch terms <span class="label-normal">(optional)</span></label>
+                  <input id="wh_edit_terms" class="form-input" type="text"
+                    name="filter_terms" maxlength="1600" autocomplete="off"
+                    placeholder="CVE-2025, critical, zero-day, ransomware"
+                    value="<?= Html::e($editTerms) ?>">
+                  <p class="form-hint">Comma-separated. Article title or summary must contain at least one term (case-insensitive).</p>
+                </div>
+
+                <?php if ($categories !== []): ?>
+                  <div class="form-group">
+                    <span class="form-label">Filter: categories <span class="label-normal">(optional)</span></span>
+                    <div class="cat-filter-grid">
+                      <?php foreach ($categories as $cat): ?>
+                        <label class="cat-filter-label">
+                          <input type="checkbox" name="filter_categories[]" value="<?= Html::e($cat['slug']) ?>"<?= isset($editFilterCats[$cat['slug']]) ? ' checked' : '' ?>>
+                          <?= Html::e($cat['name']) ?>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                    <p class="form-hint">Article source must belong to at least one checked category.</p>
+                  </div>
+                <?php endif; ?>
+
+                <?php if ($activeSources !== []): ?>
+                  <div class="form-group">
+                    <span class="form-label">Filter: sources <span class="label-normal">(optional)</span></span>
+                    <div class="cat-filter-grid" style="max-height:12rem;overflow-y:auto;">
+                      <?php foreach ($activeSources as $src): ?>
+                        <label class="cat-filter-label">
+                          <input type="checkbox" name="filter_sources[]" value="<?= Html::e($src['slug']) ?>"<?= isset($editFilterSrcs[$src['slug']]) ? ' checked' : '' ?>>
+                          <?= Html::e($src['name']) ?>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                    <p class="form-hint">Article must come from at least one of the selected sources.</p>
+                  </div>
+                <?php endif; ?>
+
+                <button type="submit" class="btn btn-primary">Save changes</button>
+                <a href="/settings/webhooks" class="btn btn-secondary">Cancel</a>
+              </form>
+            <?php endif; ?>
           </li>
         <?php endforeach; ?>
       </ul>
@@ -72,7 +155,7 @@ $formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264
       <p class="form-hint u-mb-1">No webhooks configured.</p>
     <?php endif; ?>
 
-    <?php if (count($webhooks) < 10): ?>
+    <?php if ($editingId === 0 && count($webhooks) < 10): ?>
       <form method="post" action="/settings/webhooks">
         <input type="hidden" name="_csrf" value="<?= Html::e(Csrf::token()) ?>">
 
@@ -138,7 +221,7 @@ $formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264
 
         <button type="submit" class="btn btn-primary">Add webhook</button>
       </form>
-    <?php else: ?>
+    <?php elseif ($editingId === 0): ?>
       <p class="form-hint">Maximum of 10 webhooks reached.</p>
     <?php endif; ?>
   </section>

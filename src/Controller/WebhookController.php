@@ -11,7 +11,7 @@ use Daybreak\Security\SsrfGuard;
 use Daybreak\Service\AuditLog;
 use Daybreak\Service\AuthService;
 
-/** User-facing webhook management: list, create, toggle, delete. */
+/** User-facing webhook management: list, create, edit, toggle, delete. */
 final class WebhookController
 {
     private const MAX_WEBHOOKS = 10;
@@ -46,6 +46,7 @@ final class WebhookController
             [$userId]
         )->fetchAll();
 
+        $editingId     = (int) ($_GET['edit'] ?? 0);
         $title         = 'Webhooks';
         $settingsNav   = 'webhooks';
 
@@ -72,47 +73,9 @@ final class WebhookController
             exit;
         }
 
-        $name   = trim((string) ($_POST['name']   ?? ''));
-        $url    = trim((string) ($_POST['url']     ?? ''));
-        $format = trim((string) ($_POST['format']  ?? 'generic'));
+        ['name' => $name, 'url' => $url, 'format' => $format] = $this->validateWebhookInput();
 
-        if ($name === '' || mb_strlen($name) > 120) {
-            $_SESSION['flash_error'] = 'Name must be 1–120 characters.';
-            header('Location: /settings/webhooks');
-            exit;
-        }
-
-        if (!in_array($format, self::ALLOWED_FORMATS, true)) {
-            $_SESSION['flash_error'] = 'Invalid format.';
-            header('Location: /settings/webhooks');
-            exit;
-        }
-
-        if (!preg_match('#^https?://#i', $url)) {
-            $_SESSION['flash_error'] = 'Webhook URL must start with http:// or https://.';
-            header('Location: /settings/webhooks');
-            exit;
-        }
-
-        try {
-            SsrfGuard::assertSafe($url);
-        } catch (\RuntimeException) {
-            $_SESSION['flash_error'] = 'That URL is not allowed (SSRF guard).';
-            header('Location: /settings/webhooks');
-            exit;
-        }
-
-        $recentMutations = (int) Database::query(
-            "SELECT COUNT(*) FROM audit_log
-             WHERE user_id = ? AND action IN ('webhook.create','webhook.update')
-               AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
-            [$userId]
-        )->fetchColumn();
-        if ($recentMutations >= 5) {
-            $_SESSION['flash_error'] = 'Too many requests. Please wait a moment.';
-            header('Location: /settings/webhooks');
-            exit;
-        }
+        $this->assertRateLimit($userId);
 
         $filterJson = $this->buildFilterJson($userId);
 
@@ -157,10 +120,76 @@ final class WebhookController
             );
             AuditLog::write('webhook.update', 'webhook', (string) $webhookId);
             $_SESSION['flash'] = 'Webhook updated.';
+        } elseif ($action === 'edit') {
+            ['name' => $name, 'url' => $url, 'format' => $format] = $this->validateWebhookInput();
+            $this->assertRateLimit($userId);
+            $filterJson = $this->buildFilterJson($userId);
+            Database::query(
+                'UPDATE user_webhooks SET name=?, url=?, format=?, filter_json=? WHERE id=? AND user_id=?',
+                [$name, $url, $format, $filterJson, $webhookId, $userId]
+            );
+            AuditLog::write('webhook.update', 'webhook', (string) $webhookId);
+            $_SESSION['flash'] = 'Webhook updated.';
         }
 
         header('Location: /settings/webhooks');
         exit;
+    }
+
+    /**
+     * Validates name/url/format from $_POST.
+     * On failure: sets flash_error, redirects to /settings/webhooks, and exits.
+     * On success: returns ['name', 'url', 'format'].
+     */
+    private function validateWebhookInput(): array
+    {
+        $name   = trim((string) ($_POST['name']   ?? ''));
+        $url    = trim((string) ($_POST['url']     ?? ''));
+        $format = trim((string) ($_POST['format']  ?? 'generic'));
+
+        if ($name === '' || mb_strlen($name) > 120) {
+            $_SESSION['flash_error'] = 'Name must be 1–120 characters.';
+            header('Location: /settings/webhooks');
+            exit;
+        }
+
+        if (!in_array($format, self::ALLOWED_FORMATS, true)) {
+            $_SESSION['flash_error'] = 'Invalid format.';
+            header('Location: /settings/webhooks');
+            exit;
+        }
+
+        if (!preg_match('#^https?://#i', $url)) {
+            $_SESSION['flash_error'] = 'Webhook URL must start with http:// or https://.';
+            header('Location: /settings/webhooks');
+            exit;
+        }
+
+        try {
+            SsrfGuard::assertSafe($url);
+        } catch (\RuntimeException) {
+            $_SESSION['flash_error'] = 'That URL is not allowed (SSRF guard).';
+            header('Location: /settings/webhooks');
+            exit;
+        }
+
+        return ['name' => $name, 'url' => $url, 'format' => $format];
+    }
+
+    /** Aborts with a flash error if the user has made ≥5 webhook mutations in the last minute. */
+    private function assertRateLimit(int $userId): void
+    {
+        $recentMutations = (int) Database::query(
+            "SELECT COUNT(*) FROM audit_log
+             WHERE user_id = ? AND action IN ('webhook.create','webhook.update')
+               AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
+            [$userId]
+        )->fetchColumn();
+        if ($recentMutations >= 5) {
+            $_SESSION['flash_error'] = 'Too many requests. Please wait a moment.';
+            header('Location: /settings/webhooks');
+            exit;
+        }
     }
 
     /**
