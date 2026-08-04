@@ -8,7 +8,7 @@ use Daybreak\Adapter\NormalizedItem;
 use Daybreak\Database;
 
 /**
- * Delivers new articles to user-configured outbound webhooks (Slack, Discord, generic HTTP).
+ * Delivers new articles to user-configured outbound webhooks (Slack, Discord, Teams, generic HTTP).
  *
  * Called from AggregationService after each successful source fetch. Runs synchronously
  * in the cron process — delivery is fast enough at self-hosted article volumes.
@@ -55,6 +55,7 @@ final class WebhookService
                 $payload = match ($wh['format']) {
                     'slack'   => $this->slackPayload($item, $source['name']),
                     'discord' => $this->discordPayload($item, $source['name']),
+                    'teams'   => $this->teamsPayload($item, $source['name']),
                     default   => $this->genericPayload($item, $source['name']),
                 };
 
@@ -111,6 +112,7 @@ final class WebhookService
             $payload = match ($wh['format']) {
                 'slack'   => $this->slackPayload($item, ''),
                 'discord' => $this->discordPayload($item, ''),
+                'teams'   => $this->teamsPayload($item, ''),
                 default   => $this->genericPayload($item, ''),
             };
 
@@ -209,6 +211,59 @@ final class WebhookService
                 'description' => $summary,
                 'color'       => 0xc0392b,
                 'footer'      => ['text' => $sourceName !== '' ? $sourceName : 'Daybreak'],
+            ]],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Microsoft Teams incoming webhooks (Power Automate "Workflows") require an
+     * Adaptive Card wrapped in a `message` envelope — the legacy MessageCard format
+     * and plain JSON bodies are both rejected with a "missing card" error.
+     */
+    private function teamsPayload(NormalizedItem $item, string $sourceName): string
+    {
+        $title   = mb_substr($item->title, 0, 150);
+        $summary = $item->summary !== null ? mb_substr($item->summary, 0, 500) : '';
+
+        $body = [[
+            'type'   => 'TextBlock',
+            'text'   => $title,
+            'weight' => 'Bolder',
+            'size'   => 'Medium',
+            'wrap'   => true,
+        ]];
+
+        if ($summary !== '') {
+            $body[] = [
+                'type' => 'TextBlock',
+                'text' => $summary,
+                'wrap' => true,
+            ];
+        }
+
+        $body[] = [
+            'type'     => 'TextBlock',
+            'text'     => $sourceName !== '' ? 'Daybreak · ' . $sourceName : 'Daybreak',
+            'isSubtle' => true,
+            'spacing'  => 'Small',
+            'wrap'     => true,
+        ];
+
+        return json_encode([
+            'type'        => 'message',
+            'attachments' => [[
+                'contentType' => 'application/vnd.microsoft.card.adaptive',
+                'content'     => [
+                    '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',
+                    'type'    => 'AdaptiveCard',
+                    'version' => '1.4',
+                    'body'    => $body,
+                    'actions' => [[
+                        'type'  => 'Action.OpenUrl',
+                        'title' => 'Read article',
+                        'url'   => $item->url,
+                    ]],
+                ],
             ]],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }

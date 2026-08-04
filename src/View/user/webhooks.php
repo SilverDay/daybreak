@@ -14,7 +14,8 @@ $categories    = $categories    ?? [];
 $activeSources = $activeSources ?? [];
 $recentLog     = $recentLog     ?? [];
 
-$formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Generic JSON'];
+$formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'teams' => 'Microsoft Teams', 'generic' => 'Generic JSON'];
+$formatColors = ['slack' => '#4a154b', 'discord' => '#5865f2', 'teams' => '#6264a7'];
 ?>
 <div class="settings-page">
 
@@ -39,7 +40,7 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
           <li class="watch-term-item webhook-item">
             <div class="webhook-item-header">
               <strong class="webhook-item-name"><?= Html::e($wh['name']) ?></strong>
-              <span class="source-badge" data-badge-color="<?= $wh['format'] === 'slack' ? '#4a154b' : ($wh['format'] === 'discord' ? '#5865f2' : '#334155') ?>"><?= Html::e($fmtLabel) ?></span>
+              <span class="source-badge" data-badge-color="<?= Html::e($formatColors[$wh['format']] ?? '#334155') ?>"><?= Html::e($fmtLabel) ?></span>
               <?php if (!$active): ?><span class="source-badge" data-badge-color="#94a3b8">Paused</span><?php endif; ?>
               <form method="post" action="/settings/webhooks/<?= (int) $wh['id'] ?>">
                 <input type="hidden" name="_csrf"   value="<?= Html::e(Csrf::token()) ?>">
@@ -85,7 +86,7 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
           <label class="form-label" for="wh_url">Webhook URL</label>
           <input id="wh_url" class="form-input" type="url" name="url"
             required autocomplete="off" placeholder="https://hooks.slack.com/services/…">
-          <p class="form-hint">Slack / Discord incoming webhook URL, or any HTTPS endpoint.</p>
+          <p class="form-hint">Slack / Discord / Teams incoming webhook URL, or any HTTPS endpoint.</p>
         </div>
 
         <div class="form-group">
@@ -93,6 +94,7 @@ $formatLabels = ['slack' => 'Slack', 'discord' => 'Discord', 'generic' => 'Gener
           <select id="wh_format" class="form-input" name="format">
             <option value="slack">Slack (attachment)</option>
             <option value="discord">Discord (embed)</option>
+            <option value="teams">Microsoft Teams (adaptive card)</option>
             <option value="generic" selected>Generic JSON</option>
           </select>
         </div>

@@ -15,7 +15,7 @@ use Daybreak\Service\AuthService;
 final class WebhookController
 {
     private const MAX_WEBHOOKS = 10;
-    private const ALLOWED_FORMATS = ['slack', 'discord', 'generic'];
+    private const ALLOWED_FORMATS = ['slack', 'discord', 'teams', 'generic'];
 
     public function showWebhooks(array $args = []): void
     {
