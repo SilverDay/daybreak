@@ -58,7 +58,7 @@ declare(strict_types=1); ?>
             from the last 24&nbsp;hours appear in a dedicated <em>Alerts</em> block at the top of My&nbsp;Feed.</p>
 
         <h2>Webhooks <span class="legal-lang">(account required)</span></h2>
-        <p>Push new articles to <strong>Slack</strong>, <strong>Discord</strong>, or any HTTP endpoint the moment they
+        <p>Push new articles to <strong>Slack</strong>, <strong>Discord</strong>, <strong>Microsoft Teams</strong>, or any HTTP endpoint the moment they
             land in the feed. Configure one or more webhooks under
             <a href="/settings/webhooks">Settings → Webhooks</a>, with optional filters by keyword or category so you
             only receive the alerts that matter to you.</p>

@@ -200,6 +200,32 @@ final class WebhookServiceTest extends TestCase
         $this->assertSame('CISA KEV', $embed['footer']['text']);
     }
 
+    public function testTeamsPayloadStructure(): void
+    {
+        $item = $this->item('CRITICAL: RCE in widely used library', 'Patch immediately.');
+        $payload = $this->callPayload('teamsPayload', $item, 'CISA KEV');
+
+        $this->assertSame('message', $payload['type']);
+        $card = $payload['attachments'][0];
+        $this->assertSame('application/vnd.microsoft.card.adaptive', $card['contentType']);
+
+        $content = $card['content'];
+        $this->assertSame('AdaptiveCard', $content['type']);
+
+        $titleBlock = $content['body'][0];
+        $this->assertSame('CRITICAL: RCE in widely used library', $titleBlock['text']);
+
+        $summaryBlock = $content['body'][1];
+        $this->assertStringContains('Patch immediately.', $summaryBlock['text']);
+
+        $footerBlock = $content['body'][2];
+        $this->assertStringContains('CISA KEV', $footerBlock['text']);
+
+        $action = $content['actions'][0];
+        $this->assertSame('Action.OpenUrl', $action['type']);
+        $this->assertSame('https://example.test/article', $action['url']);
+    }
+
     public function testGenericPayloadStructure(): void
     {
         $item = new NormalizedItem(
