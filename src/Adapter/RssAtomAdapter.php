@@ -29,7 +29,11 @@ final class RssAtomAdapter implements SourceAdapter
         // attack vector entirely. The regex handles internal subsets (<!DOCTYPE foo [...]>).
         // libxml_set_external_entity_loader and LIBXML_NONET are additional layers.
         $xmlBody = (string) preg_replace('/<!DOCTYPE\b[^[>]*(?:\[[^\]]*])?[^>]*>/is', '', $res['body']);
-        if (!mb_check_encoding($xmlBody, 'UTF-8')) {
+        // Only repair bytes when the document claims to be UTF-8 (or declares nothing,
+        // which defaults to UTF-8) but isn't. Documents that honestly declare a
+        // different encoding (e.g. ISO-8859-1) are handled correctly by libxml itself
+        // via that declaration — "fixing" their bytes first would double-convert them.
+        if (self::declaresUtf8($xmlBody) && !mb_check_encoding($xmlBody, 'UTF-8')) {
             $xmlBody = self::repairInvalidUtf8($xmlBody);
         }
         libxml_set_external_entity_loader(static fn() => null);
@@ -71,6 +75,17 @@ final class RssAtomAdapter implements SourceAdapter
         }
 
         return new FetchResult($items, $res['status'], $res['etag'], $res['last_modified']);
+    }
+
+    private static function declaresUtf8(string $xmlBody): bool
+    {
+        if (str_starts_with($xmlBody, "\xEF\xBB\xBF")) {
+            return true; // UTF-8 BOM
+        }
+        if (preg_match('/\A\s*<\?xml\b[^>]*\bencoding\s*=\s*["\']([^"\']+)["\']/i', $xmlBody, $m)) {
+            return strcasecmp(trim($m[1]), 'UTF-8') === 0;
+        }
+        return true; // no declaration — XML defaults to UTF-8
     }
 
     /**
