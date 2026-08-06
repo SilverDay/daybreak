@@ -29,6 +29,9 @@ final class RssAtomAdapter implements SourceAdapter
         // attack vector entirely. The regex handles internal subsets (<!DOCTYPE foo [...]>).
         // libxml_set_external_entity_loader and LIBXML_NONET are additional layers.
         $xmlBody = (string) preg_replace('/<!DOCTYPE\b[^[>]*(?:\[[^\]]*])?[^>]*>/is', '', $res['body']);
+        if (!mb_check_encoding($xmlBody, 'UTF-8')) {
+            $xmlBody = self::repairInvalidUtf8($xmlBody);
+        }
         libxml_set_external_entity_loader(static fn() => null);
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($xmlBody, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
@@ -68,6 +71,29 @@ final class RssAtomAdapter implements SourceAdapter
         }
 
         return new FetchResult($items, $res['status'], $res['etag'], $res['last_modified']);
+    }
+
+    /**
+     * Some sources declare `encoding="UTF-8"` but mis-encode occasional non-ASCII
+     * characters as Windows-1252/Latin-1 (e.g. an author name pasted from a CMS
+     * field), which makes the whole document invalid UTF-8 and fails XML parsing
+     * outright — even though every other byte is fine. Re-decode only the runs of
+     * high-bit bytes that aren't already valid UTF-8 on their own, leaving correctly
+     * encoded content untouched.
+     */
+    private static function repairInvalidUtf8(string $xmlBody): string
+    {
+        return (string) preg_replace_callback(
+            '/[\x80-\xFF]+/',
+            static function (array $m): string {
+                if (mb_check_encoding($m[0], 'UTF-8')) {
+                    return $m[0];
+                }
+                $converted = @mb_convert_encoding($m[0], 'UTF-8', 'Windows-1252');
+                return $converted !== false ? $converted : '';
+            },
+            $xmlBody
+        );
     }
 
     private function item(string $guid, string $title, string $url, string $summary, string $date): NormalizedItem
