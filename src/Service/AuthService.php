@@ -57,6 +57,7 @@ final class AuthService
     public static function requireAuth(): void
     {
         if (self::currentUser() === null) {
+            $_SESSION['flash_error'] = 'Please log in to continue.';
             header('Location: /login');
             exit;
         }
@@ -66,8 +67,8 @@ final class AuthService
     {
         $u = self::currentUser();
         if ($u === null || $u['role'] !== 'admin') {
-            http_response_code(403);
-            echo '<!doctype html><meta charset="utf-8"><title>Forbidden</title><h1>403 Forbidden</h1>';
+            $_SESSION['flash_error'] = 'You do not have permission to access that page.';
+            header('Location: /');
             exit;
         }
     }
