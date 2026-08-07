@@ -41,7 +41,7 @@
 - **Type**: Hardcoded Credential
 - **Description**: The `origin` remote is configured as `https://ghp_***@github.com/SilverDay/daybreak.git` — a GitHub personal access token embedded directly in the URL. It's stored in plaintext in `.git/config` (readable by anyone with local/shell access) and is echoed in full by any `git remote -v`, `git config -l`, or similar command, including into terminal history and tool logs.
 - **Recommendation**: Rotate this token now that it has been displayed in a tool transcript, then reconfigure the remote without embedding a credential in the URL — use SSH (`git@github.com:SilverDay/daybreak.git`) with a deploy key, or a plain HTTPS URL backed by a git credential helper / cached credential store. Never put tokens directly in `remote.url`.
-- **Status**: Open — flagged to user, not remediated (requires user's decision to rotate the token and choice of auth method)
+- **Status**: Fixed — remote reconfigured to use a repo-scoped SSH deploy key (`git@github.com:SilverDay/daybreak.git`, write access) instead of a URL-embedded PAT. Verified: `ssh -T git@github.com` authenticates as the deploy key, and `git push` succeeds with no credential prompt. The original token should still be revoked on GitHub if that hasn't been done already, since it was displayed in a tool transcript.
 
 ## [FINDING] CSRF Empty-Token Acceptance Edge Case
 - **Date**: 2026-06-12
