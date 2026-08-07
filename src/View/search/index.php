@@ -76,6 +76,9 @@ use Daybreak\Security\Csrf;
                                 </a>
                             </h3>
                             <span class="article-source"><?= Html::e($article['source_name']) ?></span>
+                            <?php if (!empty($article['also_by'])): ?>
+                                <span class="article-also-by">· Also: <?= Html::e(implode(', ', $article['also_by'])) ?><?php if (!empty($article['also_by_omitted'])): ?> +<?= (int) $article['also_by_omitted'] ?> more<?php endif; ?></span>
+                            <?php endif; ?>
                             <?php if ($article['category']): ?>
                                 <span class="article-category" data-badge-color="<?= Html::e($article['color'] ?? '#ccc') ?>">
                                     <?= Html::e($article['category']) ?>

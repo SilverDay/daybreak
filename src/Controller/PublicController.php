@@ -84,45 +84,53 @@ final class PublicController
             $params[] = $activeLanguage;
         }
 
-        $countParams = $params;
-        $total = (int) Database::query(
-            "SELECT COUNT(*)
-             FROM articles a
+        $fromJoin =
+            "articles a
              JOIN sources s ON s.id = a.source_id
                  AND s.status IN ('active', 'degraded')
                  AND s.adapter_type IN ('rss_atom', 'json_api')
-             LEFT JOIN source_categories c ON c.id = s.category_id
-             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-             {$catWhere}
-             {$langWhere}",
+             LEFT JOIN source_categories c ON c.id = s.category_id";
+        $where = "a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY) {$catWhere} {$langWhere}";
+
+        $countParams = $params;
+        $rawTotal = (int) Database::query(
+            "SELECT COUNT(*) FROM {$fromJoin} WHERE {$where}",
             $countParams
         )->fetchColumn();
 
+        // Cross-source duplicates (same story via dedup_key) must be excluded before
+        // pagination runs, or a group's non-primary member can land on a different
+        // page than its primary and the announced total won't match what's shown.
+        $dupes      = DedupService::findDuplicates($fromJoin, $where, $countParams);
+        $excludeIds = $dupes['excludeIds'];
+
+        $total = $rawTotal - count($excludeIds);
         $totalPages = max(1, (int) ceil($total / $limit));
         $page = min($page, $totalPages);
         $offset = ($page - 1) * $limit;
 
-        $queryParams = $params;
+        $excludeClause = $excludeIds !== []
+            ? 'AND a.id NOT IN (' . implode(',', array_fill(0, count($excludeIds), '?')) . ')'
+            : '';
+
+        $queryParams = array_merge($params, $excludeIds);
         $queryParams[] = $limit;
         $queryParams[] = $offset;
 
-        $articles = DedupService::group(Database::query(
+        $primaries = Database::query(
             "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
                     s.name AS source_name, s.attribution_text, s.status AS source_status,
                     s.last_recovered_at, s.language AS source_language,
                     c.name AS category, c.slug AS cat_slug, c.color
-             FROM articles a
-             JOIN sources s ON s.id = a.source_id
-                 AND s.status IN ('active', 'degraded')
-                 AND s.adapter_type IN ('rss_atom', 'json_api')
-             LEFT JOIN source_categories c ON c.id = s.category_id
-             WHERE a.published_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-             {$catWhere}
-             {$langWhere}
-             ORDER BY a.published_at DESC
+             FROM {$fromJoin}
+             WHERE {$where}
+             {$excludeClause}
+             ORDER BY a.published_at DESC, a.id DESC
              LIMIT ? OFFSET ?",
             $queryParams
-        )->fetchAll());
+        )->fetchAll();
+
+        $articles = DedupService::attachAlsoBy($primaries, $dupes['byKey']);
 
         $paginationPath = $activeCategory !== null
             ? $catFeedBase . rawurlencode($activeCategory)

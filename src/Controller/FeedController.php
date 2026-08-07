@@ -103,26 +103,59 @@ final class FeedController
             $params[] = $activeCategory;
         }
 
-        $articles = DedupService::group(Database::query(
-            "SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
-                    s.name AS source_name, s.attribution_text, s.language AS source_language,
-                    c.name AS category, c.slug AS cat_slug, c.color
-             FROM articles a
+        $fromJoin =
+            "articles a
              JOIN sources s ON s.id = a.source_id
                  AND s.status IN ('active', 'degraded')
                  AND s.adapter_type IN ('rss_atom', 'json_api')
                  {$langJoin}
              LEFT JOIN source_categories c ON c.id = s.category_id
-             LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?
-             WHERE (us.enabled IS NULL OR us.enabled = 1)
-             {$dateWhere}
-             {$catWhere}
-             ORDER BY a.published_at DESC
-             LIMIT 2000",
-            $params
-        )->fetchAll());
+             LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?";
+        $where = "(us.enabled IS NULL OR us.enabled = 1) {$dateWhere} {$catWhere}";
 
-        // Load watch terms and starred IDs before slicing (both need the full result set).
+        $rawTotal = (int) Database::query(
+            "SELECT COUNT(*) FROM {$fromJoin} WHERE {$where}",
+            $params
+        )->fetchColumn();
+
+        // Cross-source duplicates (same story via dedup_key) must be excluded before
+        // pagination runs, or a group's non-primary member can land on a different
+        // page than its primary and the total/unread count won't match what's shown.
+        $dupes      = DedupService::findDuplicates($fromJoin, $where, $params);
+        $excludeIds = $dupes['excludeIds'];
+
+        $total       = $rawTotal - count($excludeIds);
+        $totalPages  = max(1, (int) ceil($total / $limit));
+        $page        = min($page, $totalPages);
+        $unreadCount = $sinceQuery ? $total : null;
+        $offset      = ($page - 1) * $limit;
+
+        $excludeClause = $excludeIds !== []
+            ? 'AND a.id NOT IN (' . implode(',', array_fill(0, count($excludeIds), '?')) . ')'
+            : '';
+
+        $queryParams = array_merge($params, $excludeIds);
+        $queryParams[] = $limit;
+        $queryParams[] = $offset;
+
+        // STRAIGHT_JOIN forces articles as the driving table. Without it the optimizer
+        // starts from the small `sources` table and loses the idx_published ordering,
+        // falling back to a temp table + filesort (measured ~2x slower, worse as the
+        // since-last-visit window grows).
+        $primaries = Database::query(
+            "SELECT STRAIGHT_JOIN a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
+                    s.name AS source_name, s.attribution_text, s.language AS source_language,
+                    c.name AS category, c.slug AS cat_slug, c.color
+             FROM {$fromJoin}
+             WHERE {$where}
+             {$excludeClause}
+             ORDER BY a.published_at DESC, a.id DESC
+             LIMIT ? OFFSET ?",
+            $queryParams
+        )->fetchAll();
+
+        $articles = DedupService::attachAlsoBy($primaries, $dupes['byKey']);
+
         $rawTerms   = Database::query(
             'SELECT id, term FROM user_watch_terms WHERE user_id = ? ORDER BY created_at ASC',
             [$userId]
@@ -130,45 +163,59 @@ final class FeedController
         $lowerTerms = array_map(fn($t) => mb_strtolower($t['term']), $rawTerms);
         $watchTerms = array_column($rawTerms, 'term');
 
-        $starredIds = array_flip(array_map('intval', Database::query(
-            'SELECT article_id FROM user_starred_articles WHERE user_id = ?',
-            [$userId]
+        // Only the current page's rows need starred/read/watch_match flags now that
+        // pagination happens in SQL, so these lookups are scoped to just those ids.
+        $pageIds = array_map(static fn($a) => (int) $a['id'], $articles);
+
+        $starredIds = $pageIds === [] ? [] : array_flip(array_map('intval', Database::query(
+            'SELECT article_id FROM user_starred_articles WHERE user_id = ? AND article_id IN ('
+                . implode(',', array_fill(0, count($pageIds), '?')) . ')',
+            array_merge([$userId], $pageIds)
         )->fetchAll(\PDO::FETCH_COLUMN)));
 
-        $readIds = array_flip(array_map('intval', Database::query(
-            'SELECT article_id FROM user_article_reads WHERE user_id = ?',
-            [$userId]
+        $readIds = $pageIds === [] ? [] : array_flip(array_map('intval', Database::query(
+            'SELECT article_id FROM user_article_reads WHERE user_id = ? AND article_id IN ('
+                . implode(',', array_fill(0, count($pageIds), '?')) . ')',
+            array_merge([$userId], $pageIds)
         )->fetchAll(\PDO::FETCH_COLUMN)));
 
-        $alertArticles = [];
         foreach ($articles as &$a) {
             $a['starred'] = isset($starredIds[(int) ($a['id'] ?? 0)]);
             $a['read']    = isset($readIds[(int) ($a['id'] ?? 0)]);
-            if ($lowerTerms === []) {
-                $a['watch_match'] = false;
-                continue;
-            }
-            $hay = mb_strtolower($a['title'] . ' ' . ($a['summary'] ?? ''));
             $a['watch_match'] = false;
             foreach ($lowerTerms as $lt) {
-                if (str_contains($hay, $lt)) {
+                if (str_contains(mb_strtolower($a['title'] . ' ' . ($a['summary'] ?? '')), $lt)) {
                     $a['watch_match'] = true;
                     break;
                 }
             }
-            if ($a['watch_match']) {
-                $alertArticles[] = $a;
-            }
         }
         unset($a);
 
-        // Compute total and unreadCount BEFORE slicing so the "N new items" banner
-        // reflects the full deduplicated result, not just the current page.
-        $total       = count($articles);
-        $totalPages  = max(1, (int) ceil($total / $limit));
-        $page        = min($page, $totalPages);
-        $unreadCount = $sinceQuery ? $total : null;
-        $articles    = array_slice($articles, ($page - 1) * $limit, $limit);
+        // The watch-term alert banner reflects the whole filtered window, not just the
+        // current page, so it needs its own bounded query rather than reusing the
+        // per-row watch_match loop above. LIKE wildcards in a user's term must be
+        // escaped or e.g. a term containing "%" would silently become a pattern.
+        $alertArticles = [];
+        if ($rawTerms !== []) {
+            $termConds  = [];
+            $termParams = [];
+            foreach ($rawTerms as $t) {
+                $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], (string) $t['term']);
+                $termConds[]  = "(a.title LIKE ? ESCAPE '\\\\' OR a.summary LIKE ? ESCAPE '\\\\')";
+                $termParams[] = '%' . $escaped . '%';
+                $termParams[] = '%' . $escaped . '%';
+            }
+            $alertArticles = Database::query(
+                "SELECT a.id, a.title, a.url, s.name AS source_name, c.color
+                 FROM {$fromJoin}
+                 WHERE {$where}
+                   AND (" . implode(' OR ', $termConds) . ')
+                 ORDER BY a.published_at DESC, a.id DESC
+                 LIMIT 20',
+                array_merge($params, $termParams)
+            )->fetchAll();
+        }
 
         $paginationBase = ($activeCategory !== null
             ? '/feed/category/' . rawurlencode($activeCategory) . '?days=' . $windowMode
@@ -316,23 +363,32 @@ final class FeedController
         $params   = $langParams;
         $params[] = $userId;
 
-        $articles = DedupService::group(Database::query(
-            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
-                    s.name AS source_name, s.attribution_text,
-                    c.name AS category, c.color
-             FROM articles a
+        $fromJoin =
+            "articles a
              JOIN sources s ON s.id = a.source_id
                  AND s.status IN ('active', 'degraded')
                  AND s.adapter_type IN ('rss_atom', 'json_api')
                  {$langJoin}
              LEFT JOIN source_categories c ON c.id = s.category_id
-             LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?
-             WHERE (us.enabled IS NULL OR us.enabled = 1)
-               AND a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-             ORDER BY a.published_at DESC
+             LEFT JOIN user_sources us ON us.source_id = s.id AND us.user_id = ?";
+        $where = "(us.enabled IS NULL OR us.enabled = 1) AND a.published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+
+        $excludeIds = DedupService::findDuplicates($fromJoin, $where, $params)['excludeIds'];
+        $excludeClause = $excludeIds !== []
+            ? 'AND a.id NOT IN (' . implode(',', array_fill(0, count($excludeIds), '?')) . ')'
+            : '';
+
+        $articles = Database::query(
+            "SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
+                    s.name AS source_name, s.attribution_text,
+                    c.name AS category, c.color
+             FROM {$fromJoin}
+             WHERE {$where}
+             {$excludeClause}
+             ORDER BY a.published_at DESC, a.id DESC
              LIMIT 50",
-            $params
-        )->fetchAll());
+            array_merge($params, $excludeIds)
+        )->fetchAll();
 
         $appUrl  = rtrim((string) (\Daybreak\Config::get('APP_URL', '') ?? ''), '/');
         $feedUrl = $appUrl . '/feed/rss?token=' . rawurlencode($rawToken);

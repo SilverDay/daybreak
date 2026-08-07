@@ -85,22 +85,34 @@ final class SearchController
                 array_unshift($params, $userId);
             }
 
-            $sql = "
-                SELECT a.title, a.url, a.summary, a.published_at, a.dedup_key,
-                       s.id AS source_id, s.name AS source_name, s.attribution_text,
-                       c.name AS category, c.slug AS cat_slug, c.color
-                FROM articles a
+            $fromJoin =
+                "articles a
                 JOIN sources s ON s.id = a.source_id
                     AND s.status IN ('active', 'degraded')
                     AND s.adapter_type IN ('rss_atom', 'json_api')
                 LEFT JOIN source_categories c ON c.id = s.category_id
-                {$userSourceJoin}
-                WHERE " . implode(' AND ', $where) . "
-                ORDER BY a.published_at DESC
+                {$userSourceJoin}";
+            $whereSql = implode(' AND ', $where);
+
+            $dupes      = DedupService::findDuplicates($fromJoin, $whereSql, $params);
+            $excludeIds = $dupes['excludeIds'];
+            $excludeClause = $excludeIds !== []
+                ? 'AND a.id NOT IN (' . implode(',', array_fill(0, count($excludeIds), '?')) . ')'
+                : '';
+
+            $sql = "
+                SELECT a.id, a.title, a.url, a.summary, a.published_at, a.dedup_key,
+                       s.id AS source_id, s.name AS source_name, s.attribution_text,
+                       c.name AS category, c.slug AS cat_slug, c.color
+                FROM {$fromJoin}
+                WHERE {$whereSql}
+                {$excludeClause}
+                ORDER BY a.published_at DESC, a.id DESC
                 LIMIT 100
             ";
 
-            $articles = DedupService::group(Database::query($sql, $params)->fetchAll());
+            $primaries = Database::query($sql, array_merge($params, $excludeIds))->fetchAll();
+            $articles  = DedupService::attachAlsoBy($primaries, $dupes['byKey']);
 
             if (count($articles) === 0) {
                 $message = "No results found for \"" . Html::e($q) . "\".";
