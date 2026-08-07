@@ -55,7 +55,7 @@ final class RouterTest extends TestCase
         $router->dispatch('GET', '/missing');
         $output = ob_get_clean();
 
-        $this->assertSame('Not found', $output);
+        $this->assertSame('', $output);
         $this->assertSame(404, http_response_code());
     }
 }

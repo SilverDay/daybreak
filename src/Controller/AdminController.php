@@ -357,8 +357,8 @@ final class AdminController
         $sgId   = (int) ($args['id'] ?? 0);
         $sg     = Database::query('SELECT * FROM source_suggestions WHERE id = ?', [$sgId])->fetch();
         if (!$sg) {
-            http_response_code(404);
-            echo 'Not found';
+            $_SESSION['flash_error'] = 'Suggestion not found.';
+            header('Location: /admin/suggestions');
             exit;
         }
 
@@ -447,8 +447,8 @@ final class AdminController
 
         $target = Database::query('SELECT id, email, display_name FROM users WHERE id = ?', [$targetId])->fetch();
         if (!$target) {
-            http_response_code(404);
-            echo 'Not found';
+            $_SESSION['flash_error'] = 'User not found.';
+            header('Location: /admin/users');
             exit;
         }
 

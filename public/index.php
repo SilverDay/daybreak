@@ -152,6 +152,11 @@ if ($isHead) {
 
 try {
     $router->dispatch($method, $path);
+    if (http_response_code() === 404) {
+        $_SESSION['flash_error'] = 'Page not found.';
+        header('Location: /');
+        exit;
+    }
 } catch (\Throwable $e) {
     $status = http_response_code();
     if ($status < 400) {
@@ -163,7 +168,9 @@ try {
         error_log('[daybreak] ' . $e->getMessage());
         echo 'Internal error';
     } elseif ($status === 419) {
-        echo 'Request expired. Please retry.';
+        $_SESSION['flash_error'] = 'Your session expired. Please try again.';
+        header('Location: /');
+        exit;
     } else {
         echo 'Request failed.';
     }
